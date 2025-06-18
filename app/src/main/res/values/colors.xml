@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Main Pastel Palette -->
+    <color name="pastel_pink">#FFB3D9</color>
+    <color name="sky_blue">#A8D8EA</color>
+    <color name="mint_green">#A8E6CF</color>
+    
+    <!-- Accent Colors -->
+    <color name="sunflower_yellow">#FFD93D</color>
+    <color name="lavender">#C7CEEA</color>
+    
+    <!-- Text Colors -->
+    <color name="dark_grey">#2C2C2C</color>
+    <color name="navy">#1B2951</color>
+    <color name="light_grey">#F5F5F5</color>
+    <color name="medium_grey">#9E9E9E</color>
+    
+    <!-- Background Colors -->
+    <color name="background_light">#FAFAFA</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="surface_light">#F8F9FA</color>
+    
+    <!-- Primary Theme Colors -->
+    <color name="primary">#FFB3D9</color>
+    <color name="primary_variant">#FF8CC8</color>
+    <color name="primary_light">#FFE4F1</color>
+    <color name="secondary">#A8D8EA</color>
+    <color name="secondary_variant">#7CC8E0</color>
+    
+    <!-- Status Colors -->
+    <color name="success">#A8E6CF</color>
+    <color name="warning">#FFD93D</color>
+    <color name="error">#FF8A80</color>
+    <color name="info">#A8D8EA</color>
+    
+    <!-- Transparent overlays -->
+    <color name="overlay_dark">#80000000</color>
+    <color name="overlay_light">#40FFFFFF</color>
+    
+    <!-- Gradient colors -->
+    <color name="gradient_start">#FFB3D9</color>
+    <color name="gradient_end">#A8D8EA</color>
+</resources>

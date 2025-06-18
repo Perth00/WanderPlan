@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_light"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="0dp"
+        android:paddingBottom="16dp">
+
+        <!-- Header -->
+        <TextView
+            style="@style/WanderPlan.Text.PageHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/nav_settings" />
+
+        <!-- Profile Section -->
+        <androidx.cardview.widget.CardView
+            style="@style/WanderPlan.Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:layout_marginHorizontal="16dp">
+
+            <LinearLayout
+                android:id="@+id/layout_profile"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <!-- Profile Image -->
+                <ImageView
+                    android:id="@+id/iv_profile"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_marginEnd="16dp"
+                    android:background="@drawable/bg_rounded_card"
+                    android:contentDescription="@string/profile"
+                    android:padding="16dp"
+                    android:src="@drawable/ic_person"
+                    android:scaleType="centerCrop" />
+
+                <!-- Profile Info -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/WanderPlan.Text.Title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/profile" />
+
+                    <TextView
+                        android:id="@+id/tv_profile_name"
+                        style="@style/WanderPlan.Text.Body"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Traveler" />
+
+                </LinearLayout>
+
+                <!-- Arrow Icon -->
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="Edit profile"
+                    android:src="@drawable/ic_add"
+                    android:tint="@color/medium_grey" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Settings Options -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Theme Settings -->
+            <LinearLayout
+                android:id="@+id/layout_theme"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="@string/theme"
+                    android:src="@drawable/ic_settings"
+                    android:tint="@color/primary" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/theme" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="Change theme"
+                    android:src="@drawable/ic_add"
+                    android:tint="@color/medium_grey" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginHorizontal="16dp"
+                android:background="@color/light_grey" />
+
+            <!-- Feedback -->
+            <LinearLayout
+                android:id="@+id/layout_feedback"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="@string/feedback"
+                    android:src="@drawable/ic_home"
+                    android:tint="@color/primary" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/feedback" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="Send feedback"
+                    android:src="@drawable/ic_add"
+                    android:tint="@color/medium_grey" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginHorizontal="16dp"
+                android:background="@color/light_grey" />
+
+            <!-- About -->
+            <LinearLayout
+                android:id="@+id/layout_about"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="@string/about"
+                    android:src="@drawable/ic_trips"
+                    android:tint="@color/primary" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/about" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="About app"
+                    android:src="@drawable/ic_add"
+                    android:tint="@color/medium_grey" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginHorizontal="16dp"
+                android:background="@color/light_grey" />
+
+            <!-- Login -->
+            <LinearLayout
+                android:id="@+id/layout_login"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="Login"
+                    android:src="@drawable/ic_lock"
+                    android:tint="@color/primary" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Login" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="Go to login"
+                    android:src="@drawable/ic_add"
+                    android:tint="@color/medium_grey" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginHorizontal="16dp"
+                android:background="@color/light_grey" />
+
+            <!-- Register -->
+            <LinearLayout
+                android:id="@+id/layout_register"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="Register"
+                    android:src="@drawable/ic_person"
+                    android:tint="@color/primary" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Create Account" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="Go to register"
+                    android:src="@drawable/ic_add"
+                    android:tint="@color/medium_grey" />
+
+            </LinearLayout>
+
+            <!-- Divider for logout -->
+            <View
+                android:id="@+id/divider_logout"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginHorizontal="16dp"
+                android:background="@color/light_grey"
+                android:visibility="gone" />
+
+            <!-- Logout -->
+            <LinearLayout
+                android:id="@+id/layout_logout"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="Logout"
+                    android:src="@drawable/ic_arrow_back"
+                    android:tint="@color/error" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Sign Out"
+                    android:textColor="@color/error" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="Sign out"
+                    android:src="@drawable/ic_add"
+                    android:tint="@color/error" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Version Info -->
+        <TextView
+            style="@style/WanderPlan.Text.Caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="32dp"
+            android:text="WanderPlan v1.0" />
+
+    </LinearLayout>
+
+</ScrollView> 

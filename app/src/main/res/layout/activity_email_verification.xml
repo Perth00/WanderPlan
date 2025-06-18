@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_light"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <!-- Email Icon -->
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginTop="40dp"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="Email verification"
+            android:src="@drawable/ic_email"
+            android:tint="@color/primary" />
+
+        <!-- Title -->
+        <TextView
+            style="@style/WanderPlan.Text.Headline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Verify Your Email"
+            android:textColor="@color/navy" />
+
+        <!-- Email Address Display -->
+        <TextView
+            android:id="@+id/email_text"
+            style="@style/WanderPlan.Text.Body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_rounded_card"
+            android:padding="12dp"
+            android:text="user@example.com"
+            android:textColor="@color/primary"
+            android:textStyle="bold" />
+
+        <!-- Instructions -->
+        <TextView
+            android:id="@+id/instruction_text"
+            style="@style/WanderPlan.Text.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="32dp"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:text="We've sent a verification link to your email address. Please check your email and click the verification link to activate your account."
+            android:textColor="@color/medium_grey" />
+
+        <!-- Check Verification Button -->
+        <Button
+            android:id="@+id/check_verification_button"
+            style="@style/WanderPlan.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="16dp"
+            android:text="Check Verification"
+            android:textSize="16sp" />
+
+        <!-- Resend Email Button -->
+        <Button
+            android:id="@+id/resend_button"
+            style="@style/WanderPlan.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="16dp"
+            android:text="Resend Email"
+            android:textSize="16sp" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="16dp"
+            android:background="@color/light_grey" />
+
+        <!-- Help Text -->
+        <TextView
+            style="@style/WanderPlan.Text.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:gravity="center"
+            android:text="Didn't receive the email? Check your spam folder or try a different email address."
+            android:textColor="@color/medium_grey" />
+
+        <!-- Change Email Button -->
+        <Button
+            android:id="@+id/change_email_button"
+            style="@style/WanderPlan.Button.Outline"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Use Different Email"
+            android:textSize="14sp" />
+
+        <!-- Auto-check Notice -->
+        <TextView
+            style="@style/WanderPlan.Text.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:text="✨ We'll automatically detect when you verify your email"
+            android:textColor="@color/success"
+            android:textStyle="italic" />
+
+    </LinearLayout>
+
+</ScrollView> 

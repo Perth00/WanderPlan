@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_light">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="0dp"
+            android:paddingBottom="16dp">
+
+            <!-- Header -->
+            <TextView
+                style="@style/WanderPlan.Text.PageHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="@string/nav_budget" />
+
+            <!-- Budget Overview Cards -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:paddingHorizontal="16dp"
+                android:orientation="horizontal">
+
+                <!-- Total Budget Card -->
+                <androidx.cardview.widget.CardView
+                    style="@style/WanderPlan.Card"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            style="@style/WanderPlan.Text.Caption"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/total_budget" />
+
+                        <TextView
+                            android:id="@+id/tv_total_budget"
+                            style="@style/WanderPlan.Text.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="$0.00"
+                            android:textColor="@color/primary" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Total Spent Card -->
+                <androidx.cardview.widget.CardView
+                    style="@style/WanderPlan.Card"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            style="@style/WanderPlan.Text.Caption"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/total_spent" />
+
+                        <TextView
+                            android:id="@+id/tv_total_spent"
+                            style="@style/WanderPlan.Text.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="$0.00"
+                            android:textColor="@color/warning" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+
+            <!-- Remaining Budget Card -->
+            <androidx.cardview.widget.CardView
+                style="@style/WanderPlan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_marginBottom="24dp"
+                android:layout_marginHorizontal="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        style="@style/WanderPlan.Text.Caption"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/remaining" />
+
+                    <TextView
+                        android:id="@+id/tv_remaining"
+                        style="@style/WanderPlan.Text.Title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="$0.00"
+                        android:textColor="@color/success" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Recent Expenses Header -->
+            <TextView
+                style="@style/WanderPlan.Text.Title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:paddingHorizontal="16dp"
+                android:text="Recent Expenses" />
+
+            <!-- Expenses List -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_expenses"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+            <!-- Empty State -->
+            <LinearLayout
+                android:id="@+id/layout_empty_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:layout_marginBottom="16dp"
+                    android:alpha="0.5"
+                    android:contentDescription="No expenses"
+                    android:src="@drawable/ic_budget"
+                    android:tint="@color/medium_grey" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="No expenses recorded yet"
+                    android:textColor="@color/medium_grey" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <!-- Floating Action Button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_expense"
+        style="@style/WanderPlan.FAB"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="16dp"
+        android:contentDescription="@string/add_expense"
+        app:srcCompat="@drawable/ic_add" />
+
+</RelativeLayout> 

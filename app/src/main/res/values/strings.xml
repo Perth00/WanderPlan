@@ -1,0 +1,112 @@
+<resources>
+    <string name="app_name">WanderPlan</string>
+    
+    <!-- Splash Screen -->
+    <string name="app_tagline">Plan your dream trip effortlessly</string>
+    
+    <!-- Onboarding -->
+    <string name="onboarding_title_1">Plan your dream trip effortlessly ✈️</string>
+    <string name="onboarding_desc_1">Discover amazing destinations and create the perfect itinerary for your next adventure</string>
+    
+    <string name="onboarding_title_2">Organize your days &amp; activities easily 📅</string>
+    <string name="onboarding_desc_2">Keep track of all your activities, reservations, and important travel information in one place</string>
+    
+    <string name="onboarding_title_3">Track expenses, photos, and memories 🧳</string>
+    <string name="onboarding_desc_3">Manage your budget and capture precious moments to cherish your travel memories forever</string>
+    
+    <string name="skip">Skip</string>
+    <string name="get_started">Get Started</string>
+    <string name="next">Next</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_trips">My Trips</string>
+    <string name="nav_budget">Budget</string>
+    <string name="nav_settings">Settings</string>
+    
+    <!-- Home -->
+    <string name="welcome_message">Welcome, %1$s!</string>
+    <string name="upcoming_trips">Upcoming Trips</string>
+    <string name="add_new_trip">Add New Trip</string>
+    <string name="no_trips_message">No trips planned yet. Start planning your next adventure!</string>
+    
+    <!-- Trip Details -->
+    <string name="trip_title">Trip Title</string>
+    <string name="destination">Destination</string>
+    <string name="start_date">Start Date</string>
+    <string name="end_date">End Date</string>
+    <string name="notes">Notes</string>
+    <string name="save_trip">Save Trip</string>
+    <string name="edit_trip">Edit Trip</string>
+    <string name="delete_trip">Delete Trip</string>
+    
+    <!-- Itinerary -->
+    <string name="add_activity">Add Activity</string>
+    <string name="activity_title">Activity Title</string>
+    <string name="activity_time">Time</string>
+    <string name="activity_location">Location</string>
+    <string name="save_activity">Save Activity</string>
+    <string name="no_activities">No activities planned for this day</string>
+    
+    <!-- Budget -->
+    <string name="total_budget">Total Budget</string>
+    <string name="total_spent">Total Spent</string>
+    <string name="remaining">Remaining</string>
+    <string name="add_expense">Add Expense</string>
+    <string name="expense_title">Expense Title</string>
+    <string name="amount">Amount</string>
+    <string name="category">Category</string>
+    
+    <!-- Categories -->
+    <string name="category_food">Food</string>
+    <string name="category_transport">Transport</string>
+    <string name="category_hotel">Hotel</string>
+    <string name="category_activities">Activities</string>
+    <string name="category_shopping">Shopping</string>
+    <string name="category_other">Other</string>
+    
+    <!-- Settings -->
+    <string name="profile">Profile</string>
+    <string name="theme">Theme</string>
+    <string name="notifications">Notifications</string>
+    <string name="about">About</string>
+    <string name="feedback">Send Feedback</string>
+    <string name="version">Version</string>
+    
+    <!-- Common -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="add">Add</string>
+    <string name="confirm">Confirm</string>
+    <string name="select_date">Select Date</string>
+    <string name="select_time">Select Time</string>
+    <string name="photo">Photo</string>
+    <string name="add_photo">Add Photo</string>
+    
+    <!-- Authentication -->
+    <string name="welcome_back">Welcome Back!</string>
+    <string name="sign_in_subtitle">Sign in to continue your travel planning</string>
+    <string name="email_address">Email Address</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="full_name">Full Name</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="login">Login</string>
+    <string name="register">Register</string>
+    <string name="create_account">Create Account</string>
+    <string name="join_wanderplan">Join WanderPlan and start planning your adventures</string>
+    <string name="no_account">Don\'t have an account?</string>
+    <string name="register_here">Register here</string>
+    <string name="have_account">Already have an account?</string>
+    <string name="login_here">Login here</string>
+    <string name="forgot_password_title">Forgot Password?</string>
+    <string name="forgot_password_subtitle">Enter your email address and we\'ll send you instructions to reset your password</string>
+    <string name="send_verification">Send Verification Email</string>
+    <string name="check_inbox">Check Your Inbox</string>
+    <string name="reset_instructions">We\'ve sent password reset instructions to:</string>
+    <string name="resend_email">Resend Email</string>
+    <string name="email_instructions">Didn\'t receive the email? Check your spam folder or resend it.</string>
+    <string name="back_to_login">Back to Login</string>
+</resources>
