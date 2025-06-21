@@ -46,6 +46,9 @@ public class TripDetailActivity extends AppCompatActivity {
     private Trip currentTrip;
     private int tripId;
     
+    // CRITICAL FIX: Add flag to prevent finishing during operations
+    private boolean isDeletingActivity = false;
+    
     // Modern replacement for startActivityForResult
     private ActivityResultLauncher<Intent> addActivityLauncher;
 
@@ -169,15 +172,59 @@ public class TripDetailActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                Log.d(TAG, "Back button pressed");
-                finish();
+                Log.d(TAG, "Back button pressed - finishing activity gracefully");
+                
+                // CRITICAL FIX: Check if deletion is in progress
+                if (isDeletingActivity) {
+                    Log.w(TAG, "Activity deletion in progress - ignoring back press");
+                    Toast.makeText(TripDetailActivity.this, "Please wait for deletion to complete", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                // CRITICAL FIX: Ensure we finish properly without crashing
+                try {
+                    // Clear any ongoing operations before finishing
+                    if (viewModel != null && tripId != -1) {
+                        try {
+                            viewModel.getTripById(tripId).removeObservers(TripDetailActivity.this);
+                            viewModel.getActivitiesForTrip(tripId).removeObservers(TripDetailActivity.this);
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error removing observers on back press", e);
+                        }
+                    }
+                    
+                    // Finish the activity
+                    finish();
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error handling back press", e);
+                    // Force finish as last resort
+                    try {
+                        finish();
+                    } catch (Exception finishError) {
+                        Log.e(TAG, "Error force finishing activity", finishError);
+                    }
+                }
             }
         });
     }
 
     @Override
     public boolean onSupportNavigateUp() {
-        getOnBackPressedDispatcher().onBackPressed();
+        Log.d(TAG, "Navigation up pressed");
+        
+        // CRITICAL FIX: Handle navigation up safely
+        try {
+            getOnBackPressedDispatcher().onBackPressed();
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling navigation up", e);
+            // Fallback to direct finish
+            try {
+                finish();
+            } catch (Exception finishError) {
+                Log.e(TAG, "Error finishing on navigation up", finishError);
+            }
+        }
         return true;
     }
 
@@ -482,6 +529,9 @@ public class TripDetailActivity extends AppCompatActivity {
             return;
         }
         
+        // CRITICAL FIX: Set deletion flag to prevent unexpected finishing
+        isDeletingActivity = true;
+        
         Log.d(TAG, "Proceeding with deletion for: " + activity.getTitle() + " (Firebase ID: " + activity.getFirebaseId() + ")");
         
         // Show loading dialog using modern AlertDialog
@@ -492,9 +542,15 @@ public class TripDetailActivity extends AppCompatActivity {
         
         // CRITICAL FIX: Only show dialog if activity is still alive
         if (!isFinishing() && !isDestroyed()) {
-            progressDialog.show();
+            try {
+                progressDialog.show();
+            } catch (Exception e) {
+                Log.w(TAG, "Error showing progress dialog", e);
+                // Continue without dialog if there's an issue
+            }
         } else {
             Log.w(TAG, "Activity destroyed, skipping dialog and deletion");
+            isDeletingActivity = false;
             return;
         }
         
@@ -508,28 +564,46 @@ public class TripDetailActivity extends AppCompatActivity {
                 public void onSuccess(int activityId) {
                     Log.d(TAG, "Activity deletion successful: " + activityId);
                     
+                    // CRITICAL FIX: Clear deletion flag
+                    isDeletingActivity = false;
+                    
                     // CRITICAL FIX: Check activity state before UI operations
                     if (!isFinishing() && !isDestroyed()) {
                         try {
-                            if (progressDialog.isShowing()) {
+                            if (progressDialog != null && progressDialog.isShowing()) {
                                 progressDialog.dismiss();
                             }
                         } catch (Exception e) {
                             Log.w(TAG, "Error dismissing progress dialog", e);
                         }
                         
-                        Toast.makeText(TripDetailActivity.this, "Activity deleted successfully", Toast.LENGTH_SHORT).show();
+                        // CRITICAL FIX: Show success message safely
+                        try {
+                            Toast.makeText(TripDetailActivity.this, "Activity deleted successfully", Toast.LENGTH_SHORT).show();
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error showing success toast", e);
+                        }
                         
                         // CRITICAL FIX: Immediate UI refresh without using LiveData observers to prevent crashes
-                        refreshActivityDataDirectly();
+                        // Use a small delay to ensure the deletion has been processed
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            if (!isFinishing() && !isDestroyed()) {
+                                refreshActivityDataDirectly();
+                            }
+                        }, 300);
                         
-                        // Also force a sync to ensure data consistency
-                        forceSyncActivitiesQuiet();
+                        // Also force a sync to ensure data consistency after a longer delay
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            if (!isFinishing() && !isDestroyed()) {
+                                forceSyncActivitiesQuiet();
+                            }
+                        }, 1000);
+                        
                     } else {
                         Log.w(TAG, "Activity destroyed during success callback");
                         // Still try to dismiss dialog safely
                         try {
-                            if (progressDialog.isShowing()) {
+                            if (progressDialog != null && progressDialog.isShowing()) {
                                 progressDialog.dismiss();
                             }
                         } catch (Exception ignored) {}
@@ -540,10 +614,13 @@ public class TripDetailActivity extends AppCompatActivity {
                 public void onError(String error) {
                     Log.e(TAG, "Activity deletion failed: " + error);
                     
+                    // CRITICAL FIX: Clear deletion flag
+                    isDeletingActivity = false;
+                    
                     // CRITICAL FIX: Check activity state before UI operations
                     if (!isFinishing() && !isDestroyed()) {
                         try {
-                            if (progressDialog.isShowing()) {
+                            if (progressDialog != null && progressDialog.isShowing()) {
                                 progressDialog.dismiss();
                             }
                         } catch (Exception e) {
@@ -554,24 +631,50 @@ public class TripDetailActivity extends AppCompatActivity {
                         String userMessage = "Failed to delete activity";
                         if (error.contains("network") || error.contains("timeout")) {
                             userMessage = "Network error - activity may have been deleted locally";
+                        } else if (error.contains("not found") || error.contains("doesn't exist")) {
+                            userMessage = "Activity was already deleted";
                         }
                         
-                        new android.app.AlertDialog.Builder(TripDetailActivity.this)
-                                .setTitle("Delete Failed")
-                                .setMessage(userMessage + "\n\nTechnical details: " + error)
-                                .setPositiveButton("OK", null)
-                                .show();
+                        try {
+                            new android.app.AlertDialog.Builder(TripDetailActivity.this)
+                                    .setTitle("Delete Result")
+                                    .setMessage(userMessage + "\n\nRefreshing trip data...")
+                                    .setPositiveButton("OK", (dialog, which) -> {
+                                        // Force refresh after error
+                                        if (!isFinishing() && !isDestroyed()) {
+                                            refreshActivityDataDirectly();
+                                        }
+                                    })
+                                    .show();
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error showing error dialog", e);
+                            // Fallback to toast
+                            try {
+                                Toast.makeText(TripDetailActivity.this, userMessage, Toast.LENGTH_LONG).show();
+                            } catch (Exception toastError) {
+                                Log.w(TAG, "Error showing error toast", toastError);
+                            }
+                        }
                         
                         // CRITICAL FIX: Refresh data even on error to show current state without using LiveData observers
-                        refreshActivityDataDirectly();
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            if (!isFinishing() && !isDestroyed()) {
+                                refreshActivityDataDirectly();
+                                
+                                // Force sync to ensure we have correct state
+                                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                    if (!isFinishing() && !isDestroyed()) {
+                                        forceSyncActivitiesQuiet();
+                                    }
+                                }, 1000);
+                            }
+                        }, 300);
                         
-                        // Force sync to ensure we have correct state
-                        forceSyncActivitiesQuiet();
                     } else {
                         Log.w(TAG, "Activity destroyed during error callback");
                         // Still try to dismiss dialog safely
                         try {
-                            if (progressDialog.isShowing()) {
+                            if (progressDialog != null && progressDialog.isShowing()) {
                                 progressDialog.dismiss();
                             }
                         } catch (Exception ignored) {}
@@ -581,18 +684,31 @@ public class TripDetailActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Exception during activity deletion", e);
             
+            // CRITICAL FIX: Clear deletion flag on exception
+            isDeletingActivity = false;
+            
             // CRITICAL FIX: Safe cleanup on exception
             if (!isFinishing() && !isDestroyed()) {
                 try {
-                    if (progressDialog.isShowing()) {
+                    if (progressDialog != null && progressDialog.isShowing()) {
                         progressDialog.dismiss();
                     }
                 } catch (Exception dialogError) {
                     Log.w(TAG, "Error dismissing progress dialog on exception", dialogError);
                 }
                 
-                Toast.makeText(this, "Error deleting activity: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                loadTripData(); // Refresh to show current state
+                try {
+                    Toast.makeText(this, "Error deleting activity, refreshing data...", Toast.LENGTH_SHORT).show();
+                } catch (Exception toastError) {
+                    Log.w(TAG, "Error showing exception toast", toastError);
+                }
+                
+                // Force refresh to show current state
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    if (!isFinishing() && !isDestroyed()) {
+                        refreshActivityDataDirectly();
+                    }
+                }, 500);
             }
         }
     }
@@ -648,12 +764,33 @@ public class TripDetailActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     if (!isFinishing() && !isDestroyed()) {
                         Log.d(TAG, "Updating UI with " + activities.size() + " activities");
-                        displayTimeline(activities);
                         
-                        // Also update trip info to ensure consistency
-                        if (currentTrip != null) {
-                            displayTripInfo(currentTrip);
+                        try {
+                            displayTimeline(activities);
+                            
+                            // Also update trip info to ensure consistency
+                            if (currentTrip != null) {
+                                displayTripInfo(currentTrip);
+                            }
+                            
+                            Log.d(TAG, "Activity data refresh completed successfully");
+                            
+                        } catch (Exception uiError) {
+                            Log.e(TAG, "Error updating UI with refreshed data", uiError);
+                            
+                            // Fallback: try again after a short delay
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                if (!isFinishing() && !isDestroyed()) {
+                                    try {
+                                        displayTimeline(activities);
+                                    } catch (Exception fallbackError) {
+                                        Log.e(TAG, "Fallback UI update also failed", fallbackError);
+                                    }
+                                }
+                            }, 1000);
                         }
+                    } else {
+                        Log.w(TAG, "Activity destroyed during UI update - skipping");
                     }
                 });
                 
@@ -662,12 +799,20 @@ public class TripDetailActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     if (!isFinishing() && !isDestroyed()) {
                         // Show error to user but don't crash
-                        Toast.makeText(TripDetailActivity.this, "Error refreshing data", Toast.LENGTH_SHORT).show();
+                        try {
+                            Toast.makeText(TripDetailActivity.this, "Error refreshing data", Toast.LENGTH_SHORT).show();
+                        } catch (Exception toastError) {
+                            Log.w(TAG, "Error showing refresh error toast", toastError);
+                        }
                         
                         // Try fallback refresh after short delay
                         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                             if (!isFinishing() && !isDestroyed()) {
-                                loadTripData();
+                                try {
+                                    loadTripData();
+                                } catch (Exception fallbackError) {
+                                    Log.e(TAG, "Fallback loadTripData also failed", fallbackError);
+                                }
                             }
                         }, 2000);
                     }

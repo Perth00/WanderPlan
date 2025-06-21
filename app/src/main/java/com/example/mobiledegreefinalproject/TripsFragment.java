@@ -144,7 +144,11 @@ public class TripsFragment extends Fragment {
     }
 
     private void deleteTrip(Trip trip) {
-        if (getContext() == null) return;
+        // Check if fragment is still in valid state
+        if (getContext() == null || !isAdded() || getActivity() == null || getActivity().isFinishing()) {
+            android.util.Log.w("TripsFragment", "Fragment not in valid state for delete operation");
+            return;
+        }
         
         // Show loading dialog
         android.app.AlertDialog progressDialog = new android.app.AlertDialog.Builder(getContext())
@@ -156,8 +160,25 @@ public class TripsFragment extends Fragment {
         viewModel.deleteTrip(trip, new TripRepository.OnTripOperationListener() {
             @Override
             public void onSuccess(int tripId) {
-                if (progressDialog.isShowing()) {
-                    progressDialog.dismiss();
+                // Check if fragment is still valid before updating UI
+                if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+                    android.util.Log.w("TripsFragment", "Fragment destroyed during delete operation - skipping UI updates");
+                    if (progressDialog != null && progressDialog.isShowing()) {
+                        try {
+                            progressDialog.dismiss();
+                        } catch (Exception e) {
+                            android.util.Log.w("TripsFragment", "Error dismissing progress dialog", e);
+                        }
+                    }
+                    return;
+                }
+                
+                if (progressDialog != null && progressDialog.isShowing()) {
+                    try {
+                        progressDialog.dismiss();
+                    } catch (Exception e) {
+                        android.util.Log.w("TripsFragment", "Error dismissing progress dialog", e);
+                    }
                 }
                 
                 if (getContext() != null) {
@@ -169,17 +190,38 @@ public class TripsFragment extends Fragment {
             
             @Override
             public void onError(String error) {
-                if (progressDialog.isShowing()) {
-                    progressDialog.dismiss();
+                // Check if fragment is still valid before updating UI
+                if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+                    android.util.Log.w("TripsFragment", "Fragment destroyed during delete operation - skipping error UI");
+                    if (progressDialog != null && progressDialog.isShowing()) {
+                        try {
+                            progressDialog.dismiss();
+                        } catch (Exception e) {
+                            android.util.Log.w("TripsFragment", "Error dismissing progress dialog", e);
+                        }
+                    }
+                    return;
+                }
+                
+                if (progressDialog != null && progressDialog.isShowing()) {
+                    try {
+                        progressDialog.dismiss();
+                    } catch (Exception e) {
+                        android.util.Log.w("TripsFragment", "Error dismissing progress dialog", e);
+                    }
                 }
                 
                 if (getContext() != null) {
-                    new android.app.AlertDialog.Builder(getContext())
-                            .setTitle("Delete Failed")
-                            .setMessage("Failed to delete trip: " + error)
-                            .setPositiveButton("OK", null)
-                            .setIcon(android.R.drawable.ic_dialog_alert)
-                            .show();
+                    try {
+                        new android.app.AlertDialog.Builder(getContext())
+                                .setTitle("Delete Failed")
+                                .setMessage("Failed to delete trip: " + error)
+                                .setPositiveButton("OK", null)
+                                .setIcon(android.R.drawable.ic_dialog_alert)
+                                .show();
+                    } catch (Exception e) {
+                        android.util.Log.w("TripsFragment", "Error showing error dialog", e);
+                    }
                 }
                 
                 android.util.Log.e("TripsFragment", "Failed to delete trip: " + error);
@@ -188,21 +230,35 @@ public class TripsFragment extends Fragment {
     }
 
     private void observeTrips() {
+        if (viewModel == null) return;
+        
         viewModel.getAllTrips().observe(getViewLifecycleOwner(), trips -> {
-            if (trips != null) {
-                tripsAdapter.submitList(trips);
-                
-                // Show/hide empty state
-                if (trips.isEmpty()) {
-                    tripsRecyclerView.setVisibility(View.GONE);
-                    if (emptyStateText != null) {
-                        emptyStateText.setVisibility(View.VISIBLE);
+            // Check if fragment is still in valid state
+            if (!isAdded() || getActivity() == null || getActivity().isFinishing() || getContext() == null) {
+                android.util.Log.w("TripsFragment", "Fragment not in valid state for trips update");
+                return;
+            }
+            
+            if (trips != null && tripsAdapter != null) {
+                try {
+                    tripsAdapter.submitList(trips);
+                    
+                    // Show/hide empty state
+                    if (tripsRecyclerView != null) {
+                        if (trips.isEmpty()) {
+                            tripsRecyclerView.setVisibility(View.GONE);
+                            if (emptyStateText != null) {
+                                emptyStateText.setVisibility(View.VISIBLE);
+                            }
+                        } else {
+                            tripsRecyclerView.setVisibility(View.VISIBLE);
+                            if (emptyStateText != null) {
+                                emptyStateText.setVisibility(View.GONE);
+                            }
+                        }
                     }
-                } else {
-                    tripsRecyclerView.setVisibility(View.VISIBLE);
-                    if (emptyStateText != null) {
-                        emptyStateText.setVisibility(View.GONE);
-                    }
+                } catch (Exception e) {
+                    android.util.Log.e("TripsFragment", "Error updating trips list", e);
                 }
             }
         });
@@ -212,6 +268,12 @@ public class TripsFragment extends Fragment {
     public void onResume() {
         super.onResume();
         android.util.Log.d("TripsFragment", "onResume called - running duplicate cleanup");
+        
+        // Check if fragment is in valid state
+        if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+            android.util.Log.w("TripsFragment", "Fragment not in valid state for cleanup");
+            return;
+        }
         
         // Clean up any duplicates when the fragment becomes visible
         if (viewModel != null) {
@@ -227,5 +289,14 @@ public class TripsFragment extends Fragment {
                 }
             });
         }
+    }
+    
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        android.util.Log.d("TripsFragment", "onDestroy called - cleaning up");
+        // Clear references to prevent memory leaks
+        tripsAdapter = null;
+        viewModel = null;
     }
 }
