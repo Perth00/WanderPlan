@@ -132,8 +132,23 @@ public class HomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh data when returning to home fragment
+        android.util.Log.d("HomeFragment", "onResume called - running duplicate cleanup");
+        
+        // Clean up any duplicates when the fragment becomes visible
         if (viewModel != null) {
+            viewModel.cleanupDuplicateTrips(new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
+                @Override
+                public void onSuccess() {
+                    android.util.Log.d("HomeFragment", "Duplicate cleanup completed successfully");
+                }
+                
+                @Override
+                public void onError(String error) {
+                    android.util.Log.w("HomeFragment", "Duplicate cleanup failed: " + error);
+                }
+            });
+            
+            // Refresh data when returning to home fragment
             observeTrips();
         }
     }

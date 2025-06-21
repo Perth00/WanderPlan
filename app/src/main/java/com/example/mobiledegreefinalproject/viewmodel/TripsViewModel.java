@@ -62,4 +62,9 @@ public class TripsViewModel extends AndroidViewModel {
     public void deleteActivity(TripActivity activity, TripRepository.OnActivityOperationListener listener) {
         repository.deleteActivity(activity, listener);
     }
+    
+    // Method to clean up duplicate trips manually
+    public void cleanupDuplicateTrips(TripRepository.OnTripSyncListener listener) {
+        repository.forceCleanupDuplicateTrips(listener);
+    }
 } 
