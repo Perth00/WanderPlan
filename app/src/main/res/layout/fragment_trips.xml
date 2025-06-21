@@ -6,39 +6,27 @@
     android:background="@color/background_light">
 
     <!-- Header Section -->
-    <LinearLayout
-        android:id="@+id/layout_header"
+    <TextView
+        android:id="@+id/tv_header"
+        style="@style/WanderPlan.Text.PageHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingBottom="8dp">
+        android:text="@string/nav_trips" />
 
-        <!-- Page Title -->
-        <TextView
-            android:id="@+id/tv_header"
-            style="@style/WanderPlan.Text.PageHeader"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/nav_trips" />
-
-        <!-- Explanatory Text -->
-        <TextView
-            style="@style/WanderPlan.Text.Body"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:text="Manage all your trips here. Long press a trip to delete it."
-            android:textColor="@color/medium_grey"
-            android:textSize="14sp" />
-
-    </LinearLayout>
+    <!-- Info Panel -->
+    <include
+        android:id="@+id/info_panel_container"
+        layout="@layout/info_panel_strip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/tv_header" />
 
     <!-- Trips List -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_trips"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/layout_header"
+        android:layout_below="@+id/info_panel_container"
         android:padding="8dp" />
 
     <!-- Empty State -->

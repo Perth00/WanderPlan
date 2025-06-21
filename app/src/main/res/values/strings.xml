@@ -28,7 +28,7 @@
     <string name="welcome_message">Welcome, %1$s!</string>
     <string name="upcoming_trips">Upcoming Trips</string>
     <string name="add_new_trip">Add New Trip</string>
-    <string name="no_trips_message">No trips planned yet. Start planning your next adventure!</string>
+    <string name="no_trips_message">No trips yet!\nStart planning your next adventure.</string>
     
     <!-- Trip Details -->
     <string name="trip_title">Trip Title</string>

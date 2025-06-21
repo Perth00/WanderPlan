@@ -33,6 +33,9 @@ public class HomeFragment extends Fragment {
 
     private TripsAdapter tripsAdapter;
     private TripsViewModel viewModel;
+    
+    // Info Panel Manager for non-intrusive messages
+    private InfoPanelManager infoPanelManager;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -60,6 +63,25 @@ public class HomeFragment extends Fragment {
 
         // Find the button in the empty state layout
         btnAddTrip = view.findViewById(R.id.btn_add_trip_empty);
+        
+        // Initialize Info Panel Manager
+        ViewGroup infoPanelContainer = view.findViewById(R.id.info_panel_container);
+        if (infoPanelContainer != null) {
+            infoPanelManager = new InfoPanelManager(getContext(), infoPanelContainer);
+            
+            // Show appropriate tips based on user status
+            if (getActivity() instanceof MainActivity) {
+                MainActivity mainActivity = (MainActivity) getActivity();
+                UserManager userManager = mainActivity.getUserManager();
+                if (userManager != null && !userManager.isLoggedIn()) {
+                    infoPanelManager.showAccountRequiredForSync();
+                } else {
+                    infoPanelManager.showGeneralTip("This page shows your upcoming trips. Manage trips in 'My Trips' tab.");
+                }
+            }
+        } else {
+            android.util.Log.w("HomeFragment", "Info panel container not found");
+        }
     }
 
     private void setupViewModel() {

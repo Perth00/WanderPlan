@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/background_light">
+
+    <!-- Clickable Info Strip -->
+    <LinearLayout
+        android:id="@+id/info_strip_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/bg_rounded_card"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="6dp"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?android:attr/selectableItemBackground"
+        android:elevation="2dp">
+
+        <!-- Info Icon -->
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_settings"
+            app:tint="@color/primary"
+            android:layout_gravity="center_vertical"
+            android:contentDescription="Info icon" />
+
+        <!-- Info Text -->
+        <TextView
+            android:id="@+id/tv_info_strip_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="💡 Tap for tips and sync info"
+            android:textSize="15sp"
+            android:textColor="@color/primary"
+            android:textStyle="bold"
+            android:layout_gravity="center_vertical" />
+
+        <!-- Expand/Collapse Arrow -->
+        <ImageView
+            android:id="@+id/iv_info_arrow"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/primary"
+            android:layout_gravity="center_vertical"
+            android:rotation="270"
+            android:contentDescription="Expand/Collapse" />
+
+    </LinearLayout>
+
+    <!-- Expandable Info Content -->
+    <LinearLayout
+        android:id="@+id/info_panel_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_rounded_card"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="12dp"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="16dp"
+        android:elevation="2dp"
+        android:visibility="gone">
+
+        <!-- Trip Management Tips -->
+        <TextView
+            android:id="@+id/tv_trip_tips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🗺️ Long press a trip in 'My Trips' to delete it\n🏠 Home shows upcoming trips (view-only)\n🔄 Sync requires a registered account"
+            android:textSize="14sp"
+            android:textColor="@color/primary"
+            android:lineSpacingExtra="4dp"
+            android:layout_marginBottom="12dp"
+            android:fontFamily="sans-serif"
+            android:visibility="gone" />
+
+        <!-- Activity Management Tips -->
+        <TextView
+            android:id="@+id/tv_activity_tips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🎯 Long press an activity to delete it\n🔄 New activities may need a refresh to appear\n☁️ All changes sync automatically with your account"
+            android:textSize="14sp"
+            android:textColor="@color/primary"
+            android:lineSpacingExtra="4dp"
+            android:layout_marginBottom="12dp"
+            android:fontFamily="sans-serif"
+            android:visibility="gone" />
+
+        <!-- Sync Status -->
+        <TextView
+            android:id="@+id/tv_sync_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📡 Sync Status: All data up to date"
+            android:textSize="14sp"
+            android:textColor="@color/success"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:fontFamily="sans-serif"
+            android:visibility="gone" />
+
+        <!-- General Tips -->
+        <TextView
+            android:id="@+id/tv_general_tips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💡 Tip: Create an account to sync your trips across devices"
+            android:textSize="14sp"
+            android:textColor="@color/primary"
+            android:fontFamily="sans-serif"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</LinearLayout> 

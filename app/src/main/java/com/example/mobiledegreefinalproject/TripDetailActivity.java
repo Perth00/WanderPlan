@@ -6,6 +6,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -49,6 +50,9 @@ public class TripDetailActivity extends AppCompatActivity {
     // CRITICAL FIX: Add flag to prevent finishing during operations
     private boolean isDeletingActivity = false;
     
+    // Info Panel Manager for non-intrusive messages
+    private InfoPanelManager infoPanelManager;
+    
     // Modern replacement for startActivityForResult
     private ActivityResultLauncher<Intent> addActivityLauncher;
 
@@ -86,6 +90,15 @@ public class TripDetailActivity extends AppCompatActivity {
         mapPreview = findViewById(R.id.map_preview);
         fabAddActivity = findViewById(R.id.fab_add_activity);
         emptyStateText = findViewById(R.id.empty_state_text);
+        
+        // Initialize Info Panel Manager
+        ViewGroup infoPanelContainer = findViewById(R.id.info_panel_container);
+        if (infoPanelContainer != null) {
+            infoPanelManager = new InfoPanelManager(this, infoPanelContainer);
+            infoPanelManager.showActivityManagementTips();
+        } else {
+            Log.w(TAG, "Info panel container not found");
+        }
     }
 
     private void setupViewModel() {
@@ -106,8 +119,10 @@ public class TripDetailActivity extends AppCompatActivity {
                         // CRITICAL FIX: Use direct data refresh without LiveData observers to prevent crashes
                         refreshActivityDataDirectly();
                         
-                        // Show success message
-                        Toast.makeText(this, "Activity added successfully!", Toast.LENGTH_SHORT).show();
+                        // Show success message via info panel instead of toast
+                        if (infoPanelManager != null) {
+                            infoPanelManager.addCustomMessage("Activity added successfully! Refreshing timeline...", false);
+                        }
                         
                     } else {
                         Log.d(TAG, "Activity creation cancelled or failed");
@@ -177,7 +192,9 @@ public class TripDetailActivity extends AppCompatActivity {
                 // CRITICAL FIX: Check if deletion is in progress
                 if (isDeletingActivity) {
                     Log.w(TAG, "Activity deletion in progress - ignoring back press");
-                    Toast.makeText(TripDetailActivity.this, "Please wait for deletion to complete", Toast.LENGTH_SHORT).show();
+                    if (infoPanelManager != null) {
+                        infoPanelManager.addCustomMessage("Please wait for deletion to complete", true);
+                    }
                     return;
                 }
                 
@@ -250,64 +267,56 @@ public class TripDetailActivity extends AppCompatActivity {
     }
 
     private void forceSyncActivities() {
-        Log.d(TAG, "Force syncing activities for trip: " + tripId);
-        
-        // Show loading indicator
-        Toast.makeText(this, "Syncing activities...", Toast.LENGTH_SHORT).show();
-        
-        com.example.mobiledegreefinalproject.repository.TripRepository repository = 
-            com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
-        
-        repository.forceSyncAllActivities(new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
-            @Override
-            public void onSuccess() {
-                Log.d(TAG, "Force sync completed successfully");
-                runOnUiThread(() -> {
-                    Toast.makeText(TripDetailActivity.this, "Activities synced successfully!", Toast.LENGTH_SHORT).show();
-                    // Refresh data directly to update UI
-                    refreshActivityDataDirectly();
-                });
-            }
-
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, "Force sync failed: " + error);
-                runOnUiThread(() -> new android.app.AlertDialog.Builder(TripDetailActivity.this)
-                        .setTitle("Sync Failed")
-                        .setMessage("Failed to sync activities: " + error + "\n\nPlease check your internet connection and try again.")
-                        .setPositiveButton("OK", null)
-                        .show());
-            }
-        });
-    }
-    
-    // CRITICAL FIX: Silent sync method for automatic data consistency without UI notifications
-    private void forceSyncActivitiesQuiet() {
-        if (isFinishing() || isDestroyed()) {
-            return;
+        if (infoPanelManager != null) {
+            infoPanelManager.showSyncInProgress();
         }
         
-        Log.d(TAG, "Quietly syncing activities for trip: " + tripId);
-        
-        com.example.mobiledegreefinalproject.repository.TripRepository repository = 
-            com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
-        
-        repository.forceSyncTripActivities(tripId, new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
-            @Override
-            public void onSuccess() {
-                Log.d(TAG, "Quiet sync completed successfully");
-                // Don't show toast, just ensure data is consistent
-                if (!isFinishing() && !isDestroyed()) {
-                    runOnUiThread(() -> refreshActivityDataDirectly());
+        if (tripId != -1) {
+            com.example.mobiledegreefinalproject.repository.TripRepository repository = 
+                com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
+            
+            repository.forceSyncTripActivities(tripId, new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
+                @Override
+                public void onSuccess() {
+                    Log.d(TAG, "Force sync completed successfully");
+                    if (infoPanelManager != null) {
+                        infoPanelManager.showSyncSuccess();
+                    }
                 }
-            }
-
-            @Override
-            public void onError(String error) {
-                Log.w(TAG, "Quiet sync failed (this is normal): " + error);
-                // Don't show error to user for quiet sync
-            }
-        });
+                
+                @Override
+                public void onError(String error) {
+                    Log.e(TAG, "Force sync failed: " + error);
+                    if (infoPanelManager != null) {
+                        infoPanelManager.showSyncError(error);
+                    }
+                }
+            });
+        }
+    }
+    
+    private void forceSyncActivitiesQuiet() {
+        if (tripId != -1) {
+            com.example.mobiledegreefinalproject.repository.TripRepository repository = 
+                com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
+            
+            repository.forceSyncTripActivities(tripId, new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
+                @Override
+                public void onSuccess() {
+                    Log.d(TAG, "Quiet sync completed successfully");
+                    // No message for quiet sync
+                }
+                
+                @Override
+                public void onError(String error) {
+                    Log.w(TAG, "Quiet sync failed: " + error);
+                    // Only show error if it's important
+                    if (infoPanelManager != null && error.contains("network")) {
+                        infoPanelManager.showSyncError("Network sync failed");
+                    }
+                }
+            });
+        }
     }
 
     private void loadTripData() {
@@ -382,26 +391,39 @@ public class TripDetailActivity extends AppCompatActivity {
 
     private void openMapView(String destination) {
         try {
-            // Try to open Google Maps with the destination
-            String uri = "geo:0,0?q=" + android.net.Uri.encode(destination);
+            // Format destination for Google Maps
+            String query = destination.replace(" ", "+");
+            String uri = "geo:0,0?q=" + query;
+            
             Intent mapIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri));
             mapIntent.setPackage("com.google.android.apps.maps");
             
+            // Check if Google Maps is available
             if (mapIntent.resolveActivity(getPackageManager()) != null) {
                 startActivity(mapIntent);
             } else {
-                // Fallback to web browser if Google Maps not available
-                String webUri = "https://www.google.com/maps/search/" + android.net.Uri.encode(destination);
-                Intent webIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(webUri));
-                if (webIntent.resolveActivity(getPackageManager()) != null) {
-                    startActivity(webIntent);
+                // Fallback to any map app
+                mapIntent.setPackage(null);
+                if (mapIntent.resolveActivity(getPackageManager()) != null) {
+                    startActivity(mapIntent);
                 } else {
-                    Toast.makeText(this, "No map application available", Toast.LENGTH_SHORT).show();
+                    if (infoPanelManager != null) {
+                        infoPanelManager.addCustomMessage("No map application available", true);
+                    }
                 }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error opening map", e);
-            Toast.makeText(this, "Error opening map: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            if (infoPanelManager != null) {
+                infoPanelManager.addCustomMessage("Error opening map: " + e.getMessage(), true);
+            }
+        }
+        
+        if (currentTrip == null) {
+            if (infoPanelManager != null) {
+                infoPanelManager.addCustomMessage("Trip data not loaded", true);
+            }
+            return;
         }
     }
 
@@ -420,11 +442,7 @@ public class TripDetailActivity extends AppCompatActivity {
     }
 
     private void deleteTrip() {
-        if (currentTrip == null) {
-            return;
-        }
-        
-        // Show loading dialog using modern AlertDialog
+        // Show loading dialog
         android.app.AlertDialog progressDialog = new android.app.AlertDialog.Builder(this)
             .setMessage("Deleting trip...")
             .setCancelable(false)
@@ -435,10 +453,15 @@ public class TripDetailActivity extends AppCompatActivity {
             @Override
             public void onSuccess(int tripId) {
                 progressDialog.dismiss();
-                Toast.makeText(TripDetailActivity.this, "Trip deleted successfully", Toast.LENGTH_SHORT).show();
                 
-                // Return to trips list
-                finish();
+                if (infoPanelManager != null) {
+                    infoPanelManager.showTripDeletedMessage();
+                }
+                
+                // Navigate back to trips list after a short delay
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    finish();
+                }, 1500);
             }
             
             @Override
@@ -579,7 +602,9 @@ public class TripDetailActivity extends AppCompatActivity {
                         
                         // CRITICAL FIX: Show success message safely
                         try {
-                            Toast.makeText(TripDetailActivity.this, "Activity deleted successfully", Toast.LENGTH_SHORT).show();
+                            if (infoPanelManager != null) {
+                                infoPanelManager.addCustomMessage("Activity deleted successfully! Refreshing timeline...", false);
+                            }
                         } catch (Exception e) {
                             Log.w(TAG, "Error showing success toast", e);
                         }
@@ -650,7 +675,9 @@ public class TripDetailActivity extends AppCompatActivity {
                             Log.w(TAG, "Error showing error dialog", e);
                             // Fallback to toast
                             try {
-                                Toast.makeText(TripDetailActivity.this, userMessage, Toast.LENGTH_LONG).show();
+                                if (infoPanelManager != null) {
+                                    infoPanelManager.addCustomMessage(userMessage, true);
+                                }
                             } catch (Exception toastError) {
                                 Log.w(TAG, "Error showing error toast", toastError);
                             }
@@ -698,7 +725,9 @@ public class TripDetailActivity extends AppCompatActivity {
                 }
                 
                 try {
-                    Toast.makeText(this, "Error deleting activity, refreshing data...", Toast.LENGTH_SHORT).show();
+                    if (infoPanelManager != null) {
+                        infoPanelManager.addCustomMessage("Error deleting activity, refreshing data...", true);
+                    }
                 } catch (Exception toastError) {
                     Log.w(TAG, "Error showing exception toast", toastError);
                 }
@@ -800,7 +829,9 @@ public class TripDetailActivity extends AppCompatActivity {
                     if (!isFinishing() && !isDestroyed()) {
                         // Show error to user but don't crash
                         try {
-                            Toast.makeText(TripDetailActivity.this, "Error refreshing data", Toast.LENGTH_SHORT).show();
+                            if (infoPanelManager != null) {
+                                infoPanelManager.addCustomMessage("Error refreshing data", true);
+                            }
                         } catch (Exception toastError) {
                             Log.w(TAG, "Error showing refresh error toast", toastError);
                         }
