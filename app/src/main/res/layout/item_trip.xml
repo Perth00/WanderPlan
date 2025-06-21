@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp"
+    app:strokeColor="@color/card_stroke_color"
+    app:strokeWidth="0.5dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Trip Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/trip_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Trip to Tokyo"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/trip_destination"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tokyo, Japan"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/trip_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="7 days"
+                android:textSize="12sp"
+                android:textColor="@color/primary"
+                android:textStyle="bold"
+                android:background="@drawable/bg_rounded_card"
+                android:backgroundTint="@color/primary_light"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp" />
+
+        </LinearLayout>
+
+        <!-- Date Range -->
+        <TextView
+            android:id="@+id/trip_date_range"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dec 15, 2024 - Dec 22, 2024"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="12dp"
+            android:drawableStart="@drawable/ic_budget"
+            android:drawablePadding="6dp"
+            android:gravity="center_vertical" />
+
+        <!-- Map Preview -->
+        <ImageView
+            android:id="@+id/trip_map_preview"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="@drawable/bg_rounded_card"
+            android:backgroundTint="@color/background_light"
+            android:scaleType="centerCrop"
+            android:contentDescription="Map preview"
+            android:src="@drawable/ic_trips"
+            android:padding="32dp"
+            android:tint="@color/medium_grey"
+            android:alpha="0.5" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView> 

@@ -7,6 +7,25 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
+    <!-- Queries for external apps -->
+    <queries>
+        <!-- Google Maps -->
+        <package android:name="com.google.android.apps.maps" />
+        <!-- Web browsers -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -67,6 +86,24 @@
             android:name=".PasswordResetTestActivity"
             android:exported="false"
             android:theme="@style/Theme.WanderPlan" />
+        
+        <activity
+            android:name=".AddTripActivity"
+            android:exported="false"
+            android:theme="@style/Theme.WanderPlan"
+            android:parentActivityName=".MainActivity" />
+        
+        <activity
+            android:name=".TripDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.WanderPlan"
+            android:parentActivityName=".MainActivity" />
+        
+        <activity
+            android:name=".AddActivityActivity"
+            android:exported="false"
+            android:theme="@style/Theme.WanderPlan"
+            android:parentActivityName=".TripDetailActivity" />
     </application>
 
 </manifest>

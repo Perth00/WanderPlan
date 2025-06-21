@@ -103,5 +103,4 @@ public class MainActivity extends AppCompatActivity {
     
     public UserManager getUserManager() {
         return userManager;
-    }
-}
+    }}

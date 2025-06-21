@@ -1,17 +1,20 @@
 package com.example.mobiledegreefinalproject;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.util.Log;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.UserProfileChangeRequest;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class UserManager {
@@ -21,14 +24,17 @@ public class UserManager {
     private static final String KEY_USER_EMAIL = "user_email";
     private static final String KEY_PROFILE_IMAGE_URL = "profile_image_url";
     private static final String KEY_IS_GUEST = "is_guest";
-    
+
+    // Broadcast action for profile updates
+    public static final String ACTION_PROFILE_UPDATED = "com.example.mobiledegreefinalproject.PROFILE_UPDATED";
+
     private static UserManager instance;
     private Context context;
     private SharedPreferences prefs;
     private FirebaseAuth auth;
     private FirebaseFirestore firestore;
     private FirebaseStorage storage;
-    
+
     private UserManager(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -36,584 +42,446 @@ public class UserManager {
         this.firestore = FirebaseFirestore.getInstance();
         this.storage = FirebaseStorage.getInstance();
     }
-    
+
     public static synchronized UserManager getInstance(Context context) {
         if (instance == null) {
             instance = new UserManager(context);
         }
         return instance;
     }
-    
-    // Authentication state
+
     public boolean isLoggedIn() {
-        return auth.getCurrentUser() != null;
+        return auth.getCurrentUser() != null && !isGuest();
     }
-    
+
     public boolean isGuest() {
         return prefs.getBoolean(KEY_IS_GUEST, false);
     }
-    
+
     public void setGuestMode(boolean isGuest) {
         prefs.edit().putBoolean(KEY_IS_GUEST, isGuest).apply();
     }
-    
-    // User information getters
+
     public String getUserName() {
-        if (isLoggedIn()) {
-            // First try to get from local cache (which is synced from Firestore)
-            String cachedName = prefs.getString(KEY_USER_NAME, null);
-            if (cachedName != null && !cachedName.isEmpty()) {
-                return cachedName;
-            }
-            // Fallback to Firebase Auth display name
-            FirebaseUser user = auth.getCurrentUser();
-            return user.getDisplayName() != null ? user.getDisplayName() : "User";
-        } else {
-            return prefs.getString(KEY_USER_NAME, "Guest");
+        if (isGuest()) {
+            return prefs.getString(KEY_USER_NAME, "Guest User");
         }
+        
+        FirebaseUser user = auth.getCurrentUser();
+        if (user != null) {
+            String firebaseName = user.getDisplayName();
+            if (firebaseName != null && !firebaseName.trim().isEmpty()) {
+                // Update local cache
+                prefs.edit().putString(KEY_USER_NAME, firebaseName).apply();
+                return firebaseName;
+            }
+        }
+        
+        // Fallback to cached name
+        return prefs.getString(KEY_USER_NAME, "User");
     }
-    
+
     public String getUserEmail() {
-        if (isLoggedIn()) {
-            FirebaseUser user = auth.getCurrentUser();
+        if (isGuest()) {
+            return "";
+        }
+        
+        FirebaseUser user = auth.getCurrentUser();
+        if (user != null && user.getEmail() != null) {
             return user.getEmail();
-        } else {
-            return prefs.getString(KEY_USER_EMAIL, "");
         }
+        
+        return prefs.getString(KEY_USER_EMAIL, "");
     }
-    
+
     public String getProfileImageUrl() {
-        if (isLoggedIn()) {
-            // First try to get from local cache (which is synced from Firestore)
-            String cachedImageUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, null);
-            Log.d(TAG, "Getting profile image URL - Cached: " + cachedImageUrl);
-            if (cachedImageUrl != null && !cachedImageUrl.isEmpty()) {
-                return cachedImageUrl;
-            }
-            // Fallback to Firebase Auth photo URL
-            FirebaseUser user = auth.getCurrentUser();
-            String authUrl = user.getPhotoUrl() != null ? user.getPhotoUrl().toString() : "";
-            Log.d(TAG, "Getting profile image URL - Auth fallback: " + authUrl);
-            return authUrl;
-        } else {
-            String guestUrl = prefs.getString(KEY_PROFILE_IMAGE_URL, "");
-            Log.d(TAG, "Getting profile image URL - Guest: " + guestUrl);
-            return guestUrl;
+        if (isGuest()) {
+            return prefs.getString(KEY_PROFILE_IMAGE_URL, "");
         }
+        
+        FirebaseUser user = auth.getCurrentUser();
+        if (user != null && user.getPhotoUrl() != null) {
+            String firebaseImageUrl = user.getPhotoUrl().toString();
+            // Update local cache
+            prefs.edit().putString(KEY_PROFILE_IMAGE_URL, firebaseImageUrl).apply();
+            return firebaseImageUrl;
+        }
+        
+        // Fallback to cached URL
+        return prefs.getString(KEY_PROFILE_IMAGE_URL, "");
     }
-    
-    // Local data setters (for guest mode)
+
     public void setUserName(String name) {
-        if (isLoggedIn()) {
-            // Update local cache immediately for instant UI feedback
-            prefs.edit().putString(KEY_USER_NAME, name).apply();
-            // Update Firebase profile
-            updateFirebaseProfile(name, null, null);
-        } else {
-            // Update local storage
-            prefs.edit().putString(KEY_USER_NAME, name).apply();
-        }
-    }
-    
-    public void setUserName(String name, OnProfileUpdateListener listener) {
-        // ALWAYS update local cache first for instant response
         prefs.edit().putString(KEY_USER_NAME, name).apply();
-        Log.d(TAG, "Name updated locally instantly: " + name);
-        
-        if (isLoggedIn()) {
-            // Update Firebase in background (fast callback)
-            updateFirebaseProfile(name, null, listener);
-        } else {
-            // Guest mode - instant success
-            if (listener != null) {
-                // Call success immediately on main thread
-                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                    listener.onSuccess();
-                });
-            }
-        }
-    }
-    
-    public void setUserEmail(String email) {
-        prefs.edit().putString(KEY_USER_EMAIL, email).apply();
-    }
-    
-    public void setProfileImageUrl(String url) {
-        Log.d(TAG, "Setting profile image URL: " + url);
-        // Always update local cache immediately for instant UI feedback
-        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, url).apply();
-        Log.d(TAG, "Profile image URL saved to local cache");
-        
-        if (isLoggedIn()) {
-            // Also update Firebase profile for logged-in users
-            Log.d(TAG, "Updating Firebase profile with image URL");
-            updateFirebaseProfile(null, url, null);
-        }
-    }
-    
-    // Firebase operations
-    public void registerUser(String email, String password, String fullName, 
-                           OnAuthCompleteListener listener) {
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    FirebaseUser user = auth.getCurrentUser();
-                    if (user != null) {
-                        // Send email verification before allowing login
-                        sendEmailVerification(user, new OnEmailVerificationListener() {
-                            @Override
-                            public void onSuccess() {
-                                // Create user profile in Firestore
-                                createUserProfile(user.getUid(), fullName, email);
-                                setGuestMode(false);
-                                Log.d(TAG, "Registration successful, email verification sent");
-                                listener.onSuccess();
-                            }
-
-                            @Override
-                            public void onError(String error) {
-                                Log.e(TAG, "Failed to send verification email: " + error);
-                                // Still allow registration but inform user about verification issue
-                                createUserProfile(user.getUid(), fullName, email);
-                                setGuestMode(false);
-                                listener.onError("Account created but failed to send verification email: " + error);
-                            }
-                        });
-                    } else {
-                        listener.onError("Registration failed: User creation error");
-                    }
-                } else {
-                    listener.onError(task.getException() != null ? 
-                        task.getException().getMessage() : "Registration failed");
-                }
-            });
+        broadcastProfileUpdate();
     }
 
-    // Send email verification
-    public void sendEmailVerification(FirebaseUser user, OnEmailVerificationListener listener) {
-        if (user != null) {
-            user.sendEmailVerification()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        Log.d(TAG, "Email verification sent successfully");
-                        listener.onSuccess();
-                    } else {
-                        String error = task.getException() != null ? 
-                            task.getException().getMessage() : "Failed to send verification email";
-                        Log.e(TAG, "Email verification failed: " + error);
-                        listener.onError(error);
-                    }
-                });
-        } else {
-            listener.onError("No user logged in");
-        }
-    }
-
-    // Check if current user's email is verified
-    public boolean isEmailVerified() {
-        FirebaseUser user = auth.getCurrentUser();
-        return user != null && user.isEmailVerified();
-    }
-
-    // Resend email verification
-    public void resendEmailVerification(OnEmailVerificationListener listener) {
-        FirebaseUser user = auth.getCurrentUser();
-        if (user != null) {
-            sendEmailVerification(user, listener);
-        } else {
-            listener.onError("No user logged in");
-        }
-    }
-    
-    public void loginUser(String email, String password, OnAuthCompleteListener listener) {
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    FirebaseUser user = auth.getCurrentUser();
-                    if (user != null && !user.isEmailVerified()) {
-                        // Email not verified - sign out and show error
-                        auth.signOut();
-                        listener.onError("Please verify your email before logging in. Check your inbox for the verification link.");
-                        return;
-                    }
-                    
-                    setGuestMode(false);
-                    // Sync user data from Firebase BEFORE calling success
-                    syncUserDataFromFirebase(new OnDataSyncListener() {
-                        @Override
-                        public void onSuccess() {
-                            Log.d(TAG, "Login successful - user data synced");
-                            listener.onSuccess();
-                        }
-
-                        @Override
-                        public void onError(String error) {
-                            Log.w(TAG, "Login successful but data sync failed: " + error);
-                            // Still call success since login was successful
-                            listener.onSuccess();
-                        }
-                    });
-                } else {
-                    listener.onError(task.getException() != null ? 
-                        task.getException().getMessage() : "Login failed");
-                }
-            });
-    }
-    
-    public void resetPassword(String email, OnAuthCompleteListener listener) {
-        Log.d(TAG, "Attempting to send password reset email to: " + email);
-        
-        auth.sendPasswordResetEmail(email)
-            .addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    Log.d(TAG, "Password reset email sent successfully to: " + email);
-                    listener.onSuccess();
-                } else {
-                    String error = task.getException() != null ? 
-                        task.getException().getMessage() : "Password reset failed";
-                    Log.e(TAG, "Password reset failed for " + email + ": " + error);
-                    
-                    // Provide more user-friendly error messages
-                    String userFriendlyError = error;
-                    if (error.contains("user-not-found")) {
-                        userFriendlyError = "No account found with this email address. Please check your email or create a new account.";
-                    } else if (error.contains("invalid-email")) {
-                        userFriendlyError = "Invalid email address format. Please enter a valid email.";
-                    } else if (error.contains("network-request-failed")) {
-                        userFriendlyError = "Network error. Please check your internet connection and try again.";
-                    } else if (error.contains("too-many-requests")) {
-                        userFriendlyError = "Too many reset attempts. Please wait a few minutes before trying again.";
-                    }
-                    
-                    listener.onError(userFriendlyError);
-                }
-            });
-    }
-
-    // Check if user exists before attempting password reset
-    public void checkUserExists(String email, OnAuthCompleteListener listener) {
-        Log.d(TAG, "Checking if user exists: " + email);
-        
-        auth.fetchSignInMethodsForEmail(email)
-            .addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    java.util.List<String> signInMethods = task.getResult().getSignInMethods();
-                    if (signInMethods != null && !signInMethods.isEmpty()) {
-                        Log.d(TAG, "User exists with email: " + email);
-                        listener.onSuccess();
-                    } else {
-                        Log.d(TAG, "No user found with email: " + email);
-                        listener.onError("No account found with this email address");
-                    }
-                } else {
-                    String error = task.getException() != null ? 
-                        task.getException().getMessage() : "Failed to check user";
-                    Log.e(TAG, "Error checking user existence: " + error);
-                    listener.onError(error);
-                }
-            });
-    }
-    
-    public void signOut() {
-        auth.signOut();
-        clearLocalData();
-    }
-    
-    public void continueAsGuest(String guestName) {
-        setGuestMode(true);
-        setUserName(guestName != null ? guestName : "Guest");
-    }
-    
-    // Firebase Firestore operations
-    private void createUserProfile(String uid, String fullName, String email) {
-        Map<String, Object> userProfile = new HashMap<>();
-        userProfile.put("fullName", fullName);
-        userProfile.put("email", email);
-        userProfile.put("createdAt", System.currentTimeMillis());
-        
-        firestore.collection("users").document(uid)
-            .set(userProfile)
-            .addOnSuccessListener(aVoid -> Log.d(TAG, "User profile created"))
-            .addOnFailureListener(e -> Log.e(TAG, "Error creating user profile", e));
-    }
-    
-    private void updateFirebaseProfile(String name, String photoUrl, OnProfileUpdateListener listener) {
-        FirebaseUser user = auth.getCurrentUser();
-        if (user == null) {
-            if (listener != null) {
-                listener.onError("User not authenticated");
-            }
-            return;
-        }
-        
-        String uid = user.getUid();
-        Map<String, Object> updates = new HashMap<>();
-        
-        if (name != null) {
-            updates.put("fullName", name);
-        }
-        if (photoUrl != null) {
-            updates.put("profileImageUrl", photoUrl);
-        }
-        
-        if (updates.isEmpty()) {
+    public void setUserName(String name, OnProfileUpdateListener listener) {
+        if (isGuest()) {
+            setUserName(name);
             if (listener != null) {
                 listener.onSuccess();
             }
             return;
         }
-        
-        firestore.collection("users").document(uid)
-            .update(updates)
+
+        // Update Firebase profile
+        updateFirebaseProfile(name, null, new OnProfileUpdateListener() {
+            @Override
+            public void onSuccess() {
+                setUserName(name);
+                if (listener != null) {
+                    listener.onSuccess();
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (listener != null) {
+                    listener.onError(error);
+                }
+            }
+        });
+    }
+
+    public void setUserEmail(String email) {
+        prefs.edit().putString(KEY_USER_EMAIL, email).apply();
+    }
+
+    public void setProfileImageUrl(String url) {
+        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, url).apply();
+        broadcastProfileUpdate();
+    }
+
+    public void registerUser(String email, String password, String fullName, 
+                           OnAuthCompleteListener listener) {
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnSuccessListener(authResult -> {
+                FirebaseUser user = authResult.getUser();
+                if (user != null) {
+                    // Create user profile in Firestore
+                    createUserProfile(user.getUid(), fullName, email);
+                    
+                    // Send email verification
+                    sendEmailVerification(user, new OnEmailVerificationListener() {
+                        @Override
+                        public void onSuccess() {
+                            setUserName(fullName);
+                            setUserEmail(email);
+                            setGuestMode(false);
+                            listener.onSuccess();
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            Log.w(TAG, "Email verification failed", new Exception(error));
+                            // Still count as successful registration
+                            setUserName(fullName);
+                            setUserEmail(email);
+                            setGuestMode(false);
+                            listener.onSuccess();
+                        }
+                    });
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Registration failed", e);
+                listener.onError(e.getMessage());
+            });
+    }
+
+    public void sendEmailVerification(FirebaseUser user, OnEmailVerificationListener listener) {
+        if (user != null) {
+            user.sendEmailVerification()
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Email verification sent successfully");
+                    listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to send email verification", e);
+                    listener.onError(e.getMessage());
+                });
+        } else {
+            listener.onError("No user found");
+        }
+    }
+
+    public boolean isEmailVerified() {
+        FirebaseUser user = auth.getCurrentUser();
+        return user != null && user.isEmailVerified();
+    }
+
+    public void resendEmailVerification(OnEmailVerificationListener listener) {
+        FirebaseUser user = auth.getCurrentUser();
+        sendEmailVerification(user, listener);
+    }
+
+    public void loginUser(String email, String password, OnAuthCompleteListener listener) {
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnSuccessListener(authResult -> {
+                FirebaseUser user = authResult.getUser();
+                if (user != null) {
+                    setUserEmail(email);
+                    setGuestMode(false);
+                    
+                    // Sync user data from Firebase
+                    syncUserDataFromFirebase(new OnDataSyncListener() {
+                        @Override
+                        public void onSuccess() {
+                            listener.onSuccess();
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            Log.w(TAG, "Data sync failed: " + error);
+                            // Still count as successful login
+                            listener.onSuccess();
+                        }
+                    });
+                } else {
+                    listener.onError("Login failed");
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Login failed", e);
+                listener.onError(e.getMessage());
+            });
+    }
+
+    public void resetPassword(String email, OnAuthCompleteListener listener) {
+        if (email == null || email.trim().isEmpty()) {
+            listener.onError("Email is required");
+            return;
+        }
+
+        auth.sendPasswordResetEmail(email.trim())
             .addOnSuccessListener(aVoid -> {
-                Log.d(TAG, "Profile updated successfully");
+                Log.d(TAG, "Password reset email sent to: " + email);
+                listener.onSuccess();
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to send password reset email", e);
+                String errorMessage = e.getMessage();
+                if (errorMessage != null && errorMessage.contains("no user record")) {
+                    listener.onError("No account found with this email address");
+                } else {
+                    listener.onError("Failed to send reset email: " + errorMessage);
+                }
+            });
+    }
+
+    public void checkUserExists(String email, OnAuthCompleteListener listener) {
+        auth.fetchSignInMethodsForEmail(email)
+            .addOnSuccessListener(result -> {
+                if (result.getSignInMethods() != null && !result.getSignInMethods().isEmpty()) {
+                    listener.onSuccess(); // User exists
+                } else {
+                    listener.onError("No account found with this email");
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Error checking user existence", e);
+                listener.onError("Error checking email: " + e.getMessage());
+            });
+    }
+
+    public void signOut() {
+        auth.signOut();
+        clearLocalData();
+        clearTripData();
+    }
+
+    public void continueAsGuest(String guestName) {
+        setGuestMode(true);
+        setUserName(guestName);
+    }
+
+    private void createUserProfile(String uid, String fullName, String email) {
+        Map<String, Object> userProfile = new HashMap<>();
+        userProfile.put("name", fullName);
+        userProfile.put("email", email);
+        userProfile.put("createdAt", System.currentTimeMillis());
+
+        firestore.collection("users").document(uid)
+            .set(userProfile)
+            .addOnSuccessListener(aVoid -> Log.d(TAG, "User profile created"))
+            .addOnFailureListener(e -> Log.e(TAG, "Failed to create user profile", e));
+    }
+
+    private void updateFirebaseProfile(String name, String photoUrl, OnProfileUpdateListener listener) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            if (listener != null) {
+                listener.onError("No user logged in");
+            }
+            return;
+        }
+
+        UserProfileChangeRequest.Builder builder = new UserProfileChangeRequest.Builder();
+        
+        if (name != null) {
+            builder.setDisplayName(name);
+        }
+        
+        if (photoUrl != null) {
+            builder.setPhotoUri(Uri.parse(photoUrl));
+        }
+
+        user.updateProfile(builder.build())
+            .addOnSuccessListener(aVoid -> {
+                Log.d(TAG, "Firebase profile updated successfully");
+                
+                // Also update Firestore
+                Map<String, Object> updates = new HashMap<>();
+                if (name != null) {
+                    updates.put("name", name);
+                }
+                if (photoUrl != null) {
+                    updates.put("profileImageUrl", photoUrl);
+                }
+                
+                if (!updates.isEmpty()) {
+                    firestore.collection("users").document(user.getUid())
+                        .update(updates)
+                        .addOnSuccessListener(aVoid1 -> {
+                            if (listener != null) {
+                                listener.onSuccess();
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.w(TAG, "Failed to update Firestore profile", e);
+                            // Still consider success if Firebase Auth update worked
+                            if (listener != null) {
+                                listener.onSuccess();
+                            }
+                        });
+                } else {
+                    if (listener != null) {
+                        listener.onSuccess();
+                    }
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to update Firebase profile", e);
+                if (listener != null) {
+                    listener.onError(e.getMessage());
+                }
+            });
+    }
+
+    private void syncUserDataFromFirebase() {
+        syncUserDataFromFirebase(null);
+    }
+
+    public void syncUserDataFromFirebase(OnDataSyncListener listener) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null || isGuest()) {
+            if (listener != null) {
+                listener.onError("No user to sync");
+            }
+            return;
+        }
+
+        // Get user data from Firestore
+        firestore.collection("users").document(user.getUid())
+            .get()
+            .addOnSuccessListener(documentSnapshot -> {
+                if (documentSnapshot.exists()) {
+                    String name = documentSnapshot.getString("name");
+                    String profileImageUrl = documentSnapshot.getString("profileImageUrl");
+                    
+                    if (name != null && !name.trim().isEmpty()) {
+                        setUserName(name);
+                    }
+                    
+                    if (profileImageUrl != null && !profileImageUrl.trim().isEmpty()) {
+                        setProfileImageUrl(profileImageUrl);
+                    }
+                    
+                    Log.d(TAG, "User data synced from Firestore");
+                } else {
+                    Log.d(TAG, "No user document in Firestore");
+                }
+                
+                // Also sync from Firebase Auth
+                if (user.getDisplayName() != null) {
+                    setUserName(user.getDisplayName());
+                }
+                
+                if (user.getEmail() != null) {
+                    setUserEmail(user.getEmail());
+                }
+                
+                if (user.getPhotoUrl() != null) {
+                    setProfileImageUrl(user.getPhotoUrl().toString());
+                }
+                
                 if (listener != null) {
                     listener.onSuccess();
                 }
             })
             .addOnFailureListener(e -> {
-                Log.e(TAG, "Error updating profile", e);
+                Log.e(TAG, "Failed to sync user data from Firebase", e);
                 if (listener != null) {
                     listener.onError(e.getMessage());
                 }
             });
     }
-    
-    private void syncUserDataFromFirebase() {
-        syncUserDataFromFirebase(null);
-    }
-    
-    public void syncUserDataFromFirebase(OnDataSyncListener listener) {
-        FirebaseUser user = auth.getCurrentUser();
-        if (user == null) {
-            if (listener != null) {
-                listener.onError("User not authenticated");
-            }
-            return;
-        }
-        
-        String uid = user.getUid();
-        firestore.collection("users").document(uid)
-            .get()
-            .addOnSuccessListener(document -> {
-                if (document.exists()) {
-                    String fullName = document.getString("fullName");
-                    String profileImageUrl = document.getString("profileImageUrl");
-                    
-                    Log.d(TAG, "Syncing user data - fullName: " + fullName + ", profileImageUrl: " + profileImageUrl);
-                    
-                    // Update local cache
-                    if (fullName != null && !fullName.isEmpty()) {
-                        prefs.edit().putString(KEY_USER_NAME, fullName).apply();
-                        Log.d(TAG, "Updated local name cache: " + fullName);
-                    }
-                    if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
-                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, profileImageUrl).apply();
-                        Log.d(TAG, "Updated local image URL cache: " + profileImageUrl);
-                    }
-                    
-                    Log.d(TAG, "User data synced successfully");
-                    if (listener != null) {
-                        listener.onSuccess();
-                    }
-                } else {
-                    Log.w(TAG, "User document does not exist");
-                    if (listener != null) {
-                        listener.onError("User profile not found");
-                    }
-                }
-            })
-            .addOnFailureListener(e -> {
-                Log.e(TAG, "Error syncing user data", e);
-                if (listener != null) {
-                    listener.onError(e.getMessage());
-                }
-            });
-    }
-    
-    // Lightning-fast memory upload (no file I/O)
-    public void uploadProfileImageFromMemory(byte[] imageData, OnImageUploadListener listener) {
-        if (!isLoggedIn()) {
-            // For guest mode, save as base64 string locally (fast)
-            String base64 = android.util.Base64.encodeToString(imageData, android.util.Base64.DEFAULT);
-            setProfileImageUrl("data:image/jpeg;base64," + base64);
-            listener.onSuccess("data:image/jpeg;base64," + base64);
-            return;
-        }
 
-        FirebaseUser user = auth.getCurrentUser();
-        if (user == null) {
-            if (listener != null) {
-                listener.onError("User not authenticated");
-            }
-            return;
-        }
-
-        try {
-            String fileName = "profile_" + user.getUid() + "_" + System.currentTimeMillis() + ".jpg";
-            StorageReference imageRef = storage.getReference()
-                .child("profile_images")
-                .child(fileName);
-
-            // Direct byte array upload - SUPER FAST
-            Log.d(TAG, "Starting lightning upload: " + imageData.length + " bytes");
-            
-            imageRef.putBytes(imageData)
-                .addOnSuccessListener(taskSnapshot -> {
-                    imageRef.getDownloadUrl().addOnSuccessListener(downloadUrl -> {
-                        String url = downloadUrl.toString();
-                        Log.d(TAG, "Lightning upload complete: " + url);
-                        
-                        // IMMEDIATELY save to local cache
-                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, url).apply();
-                        Log.d(TAG, "URL cached instantly: " + url);
-                        
-                        // Update Firestore in background (don't wait)
-                        updateFirebaseProfile(null, url, new OnProfileUpdateListener() {
-                            @Override
-                            public void onSuccess() {
-                                Log.d(TAG, "Background Firestore update complete");
-                            }
-                            @Override
-                            public void onError(String error) {
-                                Log.w(TAG, "Background Firestore update failed: " + error);
-                            }
-                        });
-                        
-                        // Call success immediately
-                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                            if (listener != null) {
-                                listener.onSuccess(url);
-                            }
-                        });
-                        
-                    }).addOnFailureListener(e -> {
-                        Log.e(TAG, "Error getting download URL", e);
-                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                            if (listener != null) {
-                                listener.onError("Failed to get image URL");
-                            }
-                        });
-                    });
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error uploading image bytes", e);
-                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                        if (listener != null) {
-                            listener.onError("Upload failed: " + e.getMessage());
-                        }
-                    });
-                });
-                
-        } catch (Exception e) {
-            Log.e(TAG, "Memory upload error", e);
-            if (listener != null) {
-                listener.onError("Upload error: " + e.getMessage());
-            }
-        }
+    private void broadcastProfileUpdate() {
+        Intent intent = new Intent(ACTION_PROFILE_UPDATED);
+        context.sendBroadcast(intent);
     }
 
-    // Upload profile image
     public void uploadProfileImage(Uri imageUri, OnImageUploadListener listener) {
-        if (!isLoggedIn()) {
-            // For guest mode, just save local path
-            setProfileImageUrl(imageUri.toString());
-            listener.onSuccess(imageUri.toString());
+        if (isGuest()) {
+            listener.onError("Image upload not available for guest users");
             return;
         }
-        
+
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
-            if (listener != null) {
-                listener.onError("User not authenticated");
-            }
+            listener.onError("No user logged in");
             return;
         }
-        
-        // Check if Firebase Storage is properly configured
+
         try {
-            String fileName = "profile_" + user.getUid() + ".jpg";
-            StorageReference imageRef = storage.getReference()
-                .child("profile_images")
-                .child(fileName);
-            
-            // Test storage access first
-            imageRef.putFile(imageUri)
+            String fileName = "profile_images/" + user.getUid() + "_" + System.currentTimeMillis() + ".jpg";
+            StorageReference storageRef = storage.getReference().child(fileName);
+
+            storageRef.putFile(imageUri)
                 .addOnSuccessListener(taskSnapshot -> {
-                    imageRef.getDownloadUrl().addOnSuccessListener(downloadUrl -> {
-                        String url = downloadUrl.toString();
-                        Log.d(TAG, "Image uploaded successfully: " + url);
+                    storageRef.getDownloadUrl().addOnSuccessListener(downloadUri -> {
+                        String imageUrl = downloadUri.toString();
                         
-                        // IMMEDIATELY save the image URL to local storage for instant access
-                        prefs.edit().putString(KEY_PROFILE_IMAGE_URL, url).apply();
-                        Log.d(TAG, "Image URL saved to local cache immediately: " + url);
-                        
-                        // Update Firestore with the new profile image URL
-                        updateFirebaseProfile(null, url, new OnProfileUpdateListener() {
+                        // Update Firebase profile
+                        updateFirebaseProfile(null, imageUrl, new OnProfileUpdateListener() {
                             @Override
                             public void onSuccess() {
-                                Log.d(TAG, "Profile image URL saved to Firestore successfully");
-                                Log.d(TAG, "Calling upload success callback with URL: " + url);
-                                // Ensure callback is called on main thread
-                                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                                    if (listener != null) {
-                                        listener.onSuccess(url);
-                                    }
-                                });
+                                setProfileImageUrl(imageUrl);
+                                listener.onSuccess(imageUrl);
                             }
 
                             @Override
                             public void onError(String error) {
-                                Log.e(TAG, "Failed to save image URL to Firestore: " + error);
-                                Log.d(TAG, "Still calling upload success callback with URL: " + url);
-                                // Still call success since the image was uploaded successfully
-                                // Ensure callback is called on main thread
-                                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                                    if (listener != null) {
-                                        listener.onSuccess(url);
-                                    }
-                                });
+                                listener.onError("Failed to update profile: " + error);
                             }
                         });
-                        
                     }).addOnFailureListener(e -> {
-                        Log.e(TAG, "Error getting download URL", e);
-                        // Ensure callback is called on main thread
-                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                            if (listener != null) {
-                                listener.onError("Failed to get image URL. Please check Firebase Storage configuration.");
-                            }
-                        });
+                        Log.e(TAG, "Failed to get download URL", e);
+                        listener.onError("Failed to get image URL: " + e.getMessage());
                     });
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error uploading image", e);
-                    
-                    // Build error message as final variable
-                    final String errorMessage;
-                    if (e.getMessage() != null && e.getMessage().contains("Object does not exist")) {
-                        errorMessage = "Image upload failed. Firebase Storage is not properly configured. Please contact support.";
-                    } else if (e.getMessage() != null && e.getMessage().contains("permission")) {
-                        errorMessage = "Image upload failed. Storage permission denied. Please check Firebase Storage rules.";
-                    } else {
-                        errorMessage = "Image upload failed. Please try again later.";
-                    }
-                    
-                    // Ensure callback is called on main thread
-                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                        if (listener != null) {
-                            listener.onError(errorMessage);
-                        }
-                    });
+                    Log.e(TAG, "Failed to upload image", e);
+                    listener.onError("Failed to upload image: " + e.getMessage());
                 });
         } catch (Exception e) {
             Log.e(TAG, "Firebase Storage not configured", e);
-            if (listener != null) {
-                listener.onError("Image upload feature is currently unavailable. Please try again later.");
-            }
+            listener.onError("Image upload feature is currently unavailable. Please try again later.");
         }
     }
-    
+
     private void clearLocalData() {
         prefs.edit()
             .remove(KEY_USER_NAME)
@@ -622,23 +490,34 @@ public class UserManager {
             .remove(KEY_IS_GUEST)
             .apply();
     }
-    
+
+    private void clearTripData() {
+        try {
+            com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+                com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(context);
+            repo.clearFirebaseTripsFromLocal();
+            Log.d(TAG, "Firebase trip data cleared from local storage");
+        } catch (Exception e) {
+            Log.e(TAG, "Error clearing trip data", e);
+        }
+    }
+
     // Callback interfaces
     public interface OnAuthCompleteListener {
         void onSuccess();
         void onError(String error);
     }
-    
+
     public interface OnImageUploadListener {
         void onSuccess(String imageUrl);
         void onError(String error);
     }
-    
+
     public interface OnProfileUpdateListener {
         void onSuccess();
         void onError(String error);
     }
-    
+
     public interface OnDataSyncListener {
         void onSuccess();
         void onError(String error);
@@ -648,4 +527,182 @@ public class UserManager {
         void onSuccess();
         void onError(String error);
     }
-} 
+
+    public interface OnTripSyncListener {
+        void onSuccess();
+        void onError(String error);
+        void onSyncRequired(int localTripCount, int firebaseTripCount);
+    }
+
+    // Trip sync methods
+    public void checkTripSyncStatus(OnTripSyncListener listener) {
+        if (!isLoggedIn()) {
+            listener.onError("User not logged in");
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+                    com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(context);
+                
+                // Get unsynced local trips
+                List<com.example.mobiledegreefinalproject.database.Trip> unsyncedTrips = repo.getUnsyncedTripsSync();
+                List<com.example.mobiledegreefinalproject.database.Trip> allTrips = repo.getAllTripsSync();
+                
+                int localTripCount = unsyncedTrips.size();
+                int firebaseTripCount = allTrips.size() - localTripCount; // Trips that have Firebase IDs
+                
+                Log.d(TAG, "Trip sync status: " + localTripCount + " local trips, " + firebaseTripCount + " Firebase trips");
+                
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    if (localTripCount > 0) {
+                        // There are unsynced local trips
+                        listener.onSyncRequired(localTripCount, firebaseTripCount);
+                    } else {
+                        // No sync needed
+                        listener.onSuccess();
+                    }
+                });
+                    
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking trip sync status", e);
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onError("Failed to check trip sync status: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    public void syncLocalTripsToFirebase(OnTripSyncListener listener) {
+        if (!isLoggedIn()) {
+            listener.onError("User not logged in");
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "Starting sync of local trips to Firebase");
+                
+                com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+                    com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(context);
+                
+                // Get all unsynced trips (trips with firebaseId = null or synced = false)
+                List<com.example.mobiledegreefinalproject.database.Trip> unsyncedTrips = repo.getUnsyncedTripsSync();
+                
+                if (unsyncedTrips.isEmpty()) {
+                    Log.d(TAG, "No unsynced trips found");
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                        listener.onSuccess();
+                    });
+                    return;
+                }
+                
+                Log.d(TAG, "Found " + unsyncedTrips.size() + " unsynced trips to sync");
+                
+                // Counter for tracking completion
+                final int[] completed = {0};
+                final int[] successful = {0};
+                final boolean[] hasError = {false};
+                final StringBuilder errorMessages = new StringBuilder();
+                final int totalTrips = unsyncedTrips.size();
+                
+                // Sync each trip (this will also sync activities)
+                for (com.example.mobiledegreefinalproject.database.Trip trip : unsyncedTrips) {
+                    Log.d(TAG, "Syncing trip: " + trip.getTitle());
+                    
+                    repo.syncTripWithActiviesToFirebase(trip, new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripOperationListener() {
+                        @Override
+                        public void onSuccess(int tripId) {
+                            synchronized (completed) {
+                                completed[0]++;
+                                successful[0]++;
+                                Log.d(TAG, "Trip synced successfully (" + completed[0] + "/" + totalTrips + ")");
+                                
+                                if (completed[0] >= totalTrips) {
+                                    // All trips processed
+                                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                                        if (successful[0] == totalTrips) {
+                                            Log.d(TAG, "All trips synced successfully");
+                                            listener.onSuccess();
+                                        } else {
+                                            String message = "Partial sync: " + successful[0] + "/" + totalTrips + " trips synced";
+                                            if (errorMessages.length() > 0) {
+                                                message += ". Errors: " + errorMessages.toString();
+                                            }
+                                            listener.onError(message);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                        
+                        @Override
+                        public void onError(String error) {
+                            synchronized (completed) {
+                                completed[0]++;
+                                hasError[0] = true;
+                                if (errorMessages.length() > 0) {
+                                    errorMessages.append(", ");
+                                }
+                                errorMessages.append(error);
+                                Log.e(TAG, "Failed to sync trip: " + error + " (" + completed[0] + "/" + totalTrips + ")");
+                                
+                                if (completed[0] >= totalTrips) {
+                                    // All trips processed
+                                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                                        String message = "Sync completed with errors: " + successful[0] + "/" + totalTrips + " trips synced";
+                                        if (errorMessages.length() > 0) {
+                                            message += ". Errors: " + errorMessages.toString();
+                                        }
+                                        listener.onError(message);
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error during local trips sync", e);
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onError("Failed to sync local trips: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    public void discardLocalTrips(OnTripSyncListener listener) {
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "Discarding local unsynced trips");
+                
+                com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+                    com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(context);
+                
+                // Get all unsynced trips and delete them
+                List<com.example.mobiledegreefinalproject.database.Trip> unsyncedTrips = repo.getUnsyncedTripsSync();
+                
+                Log.d(TAG, "Found " + unsyncedTrips.size() + " unsynced trips to discard");
+                
+                for (com.example.mobiledegreefinalproject.database.Trip trip : unsyncedTrips) {
+                    Log.d(TAG, "Discarding trip: " + trip.getTitle());
+                    // This will also delete all activities for the trip due to cascade
+                    repo.deleteTrip(trip, null); // null listener since we don't care about Firebase deletion
+                }
+                
+                Log.d(TAG, "Successfully discarded " + unsyncedTrips.size() + " local trips");
+                
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onSuccess();
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error discarding local trips", e);
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onError("Failed to discard local trips: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+}

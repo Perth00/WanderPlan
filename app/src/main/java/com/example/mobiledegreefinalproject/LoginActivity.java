@@ -102,11 +102,8 @@ public class LoginActivity extends AppCompatActivity {
             public void onSuccess() {
                 Toast.makeText(LoginActivity.this, "Login successful!", Toast.LENGTH_SHORT).show();
                 
-                // Navigate to MainActivity
-                Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-                finish();
+                // Check for trip sync after successful login
+                checkTripSyncStatus();
             }
 
             @Override
@@ -117,8 +114,8 @@ public class LoginActivity extends AppCompatActivity {
                 if (error.contains("verify your email")) {
                     showEmailVerificationDialog(email, error);
                 } else {
-                    Toast.makeText(LoginActivity.this, 
-                        "Login failed: " + error, Toast.LENGTH_LONG).show();
+                Toast.makeText(LoginActivity.this, 
+                    "Login failed: " + error, Toast.LENGTH_LONG).show();
                 }
             }
         });
@@ -251,5 +248,163 @@ public class LoginActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+    }
+    
+    private void checkTripSyncStatus() {
+        // First fetch Firebase trips, then check for sync conflicts
+        fetchFirebaseTrips(() -> {
+            userManager.checkTripSyncStatus(new UserManager.OnTripSyncListener() {
+                @Override
+                public void onSuccess() {
+                    // No sync needed, proceed to main activity
+                    navigateToMainActivity();
+                }
+                
+                @Override
+                public void onError(String error) {
+                    // Error checking sync, but proceed anyway
+                    android.util.Log.e("LoginActivity", "Trip sync check error: " + error);
+                    navigateToMainActivity();
+                }
+                
+                @Override
+                public void onSyncRequired(int localTripCount, int firebaseTripCount) {
+                    // Show sync dialog
+                    showTripSyncDialog(localTripCount, firebaseTripCount);
+                }
+            });
+        });
+    }
+    
+    private void fetchFirebaseTrips(Runnable onComplete) {
+        android.util.Log.d("LoginActivity", "Fetching Firebase trips...");
+        
+        com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+            com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
+            
+        repo.fetchTripsFromFirebase(new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
+            @Override
+            public void onSuccess() {
+                android.util.Log.d("LoginActivity", "Firebase trips fetched successfully");
+                
+                // After successful fetch, cleanup any orphaned Firebase activities
+                android.util.Log.d("LoginActivity", "Starting orphaned activity cleanup...");
+                repo.cleanupOrphanedFirebaseActivities(new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
+                    @Override
+                    public void onSuccess() {
+                        android.util.Log.d("LoginActivity", "Orphaned activity cleanup completed");
+                        if (onComplete != null) {
+                            onComplete.run();
+                        }
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        android.util.Log.w("LoginActivity", "Orphaned activity cleanup failed: " + error);
+                        // Continue anyway - this is not critical
+                        if (onComplete != null) {
+                            onComplete.run();
+                        }
+                    }
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                android.util.Log.e("LoginActivity", "Error fetching Firebase trips: " + error);
+                // Continue anyway - but skip cleanup since fetch failed
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            }
+        });
+    }
+    
+    private void showTripSyncDialog(int localTripCount, int firebaseTripCount) {
+        String message;
+        if (firebaseTripCount > 0) {
+            message = "Unsynced Trips Detected\n\n" +
+                     "You've created " + localTripCount + " trip(s) while using the app without an account.\n" +
+                     "Your account already has " + firebaseTripCount + " trip(s).\n\n" +
+                     "Would you like to add the local trips to your account?";
+        } else {
+            message = "Unsynced Trips Detected\n\n" +
+                     "You've created " + localTripCount + " trip(s) while using the app without an account.\n\n" +
+                     "Would you like to add these trips to your account?";
+        }
+        
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Trip Sync")
+                .setMessage(message)
+                .setPositiveButton("🟢 Sync to Account", (dialog, which) -> {
+                    syncTripsToAccount();
+                })
+                .setNegativeButton("🗑 Discard Local Trips", (dialog, which) -> {
+                    discardLocalTrips();
+                })
+                .setCancelable(false) // Force user to make a choice
+                .show();
+    }
+    
+    private void syncTripsToAccount() {
+        // Show loading dialog
+        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+        progressDialog.setMessage("Syncing trips to your account...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+        
+        userManager.syncLocalTripsToFirebase(new UserManager.OnTripSyncListener() {
+            @Override
+            public void onSuccess() {
+                progressDialog.dismiss();
+                Toast.makeText(LoginActivity.this, "Trips synced successfully!", Toast.LENGTH_SHORT).show();
+                navigateToMainActivity();
+            }
+            
+            @Override
+            public void onError(String error) {
+                progressDialog.dismiss();
+                new android.app.AlertDialog.Builder(LoginActivity.this)
+                        .setTitle("Sync Failed")
+                        .setMessage("Failed to sync trips: " + error + "\n\nWould you like to continue anyway?")
+                        .setPositiveButton("Continue", (dialog, which) -> {
+                            navigateToMainActivity();
+                        })
+                        .setNegativeButton("Retry", (dialog, which) -> {
+                            syncTripsToAccount();
+                        })
+                        .show();
+            }
+            
+            @Override
+            public void onSyncRequired(int localTripCount, int firebaseTripCount) {
+                // This shouldn't be called here
+                progressDialog.dismiss();
+                navigateToMainActivity();
+            }
+        });
+    }
+    
+    private void discardLocalTrips() {
+        userManager.discardLocalTrips(new UserManager.OnTripSyncListener() {
+            @Override
+            public void onSuccess() {
+                Toast.makeText(LoginActivity.this, "Local trips discarded", Toast.LENGTH_SHORT).show();
+                navigateToMainActivity();
+            }
+            
+            @Override
+            public void onError(String error) {
+                android.util.Log.e("LoginActivity", "Failed to discard local trips: " + error);
+                // Continue anyway
+                navigateToMainActivity();
+            }
+            
+            @Override
+            public void onSyncRequired(int localTripCount, int firebaseTripCount) {
+                // This shouldn't be called here
+                navigateToMainActivity();
+            }
+        });
     }
 } 

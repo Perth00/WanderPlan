@@ -104,10 +104,10 @@ public class ForgotPasswordActivity extends AppCompatActivity {
             @Override
             public void onSuccess() {
                 // User exists, now send reset email
-                userManager.resetPassword(email, new UserManager.OnAuthCompleteListener() {
-                    @Override
-                    public void onSuccess() {
-                        showConfirmationView(email);
+        userManager.resetPassword(email, new UserManager.OnAuthCompleteListener() {
+            @Override
+            public void onSuccess() {
+                showConfirmationView(email);
                     }
 
                     @Override

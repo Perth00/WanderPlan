@@ -5,14 +5,19 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.mobiledegreefinalproject.adapter.TripsAdapter;
+import com.example.mobiledegreefinalproject.viewmodel.TripsViewModel;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
@@ -23,10 +28,11 @@ public class HomeFragment extends Fragment {
     private TextView welcomeText;
     private RecyclerView tripsRecyclerView;
     private FloatingActionButton fabAddTrip;
-    
-    // TODO: Replace with actual trip adapter
-    // private TripAdapter tripAdapter;
-    // private List<Trip> trips;
+    private LinearLayout emptyStateLayout;
+    private Button btnAddTrip;
+
+    private TripsAdapter tripsAdapter;
+    private TripsViewModel viewModel;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -37,44 +43,54 @@ public class HomeFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
+
         initViews(view);
+        setupViewModel();
         setupRecyclerView();
         setupClickListeners();
         updateWelcomeMessage();
+        observeTrips();
     }
 
     private void initViews(View view) {
         welcomeText = view.findViewById(R.id.tv_welcome);
         tripsRecyclerView = view.findViewById(R.id.rv_trips);
         fabAddTrip = view.findViewById(R.id.fab_add_trip);
+        emptyStateLayout = view.findViewById(R.id.layout_empty_state);
+
+        // Find the button in the empty state layout
+        btnAddTrip = view.findViewById(R.id.btn_add_trip_empty);
+    }
+
+    private void setupViewModel() {
+        viewModel = new ViewModelProvider(this).get(TripsViewModel.class);
     }
 
     private void setupRecyclerView() {
+        tripsAdapter = new TripsAdapter(trip -> {
+            // Navigate to trip detail
+            Intent intent = new Intent(getContext(), TripDetailActivity.class);
+            intent.putExtra("trip_id", trip.getId());
+            startActivity(intent);
+        });
+
         tripsRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        
-        // TODO: Initialize with actual trip data
-        // trips = new ArrayList<>();
-        // tripAdapter = new TripAdapter(trips, this::onTripClick);
-        // tripsRecyclerView.setAdapter(tripAdapter);
-        
-        // For now, hide the RecyclerView since we don't have data yet
-        tripsRecyclerView.setVisibility(View.GONE);
+        tripsRecyclerView.setAdapter(tripsAdapter);
     }
 
     private void setupClickListeners() {
         fabAddTrip.setOnClickListener(v -> {
-            // TODO: Navigate to AddTripActivity
-            // Intent intent = new Intent(getActivity(), AddTripActivity.class);
-            // startActivity(intent);
-            
-            // For now, show a simple message
-            if (getContext() != null) {
-                android.widget.Toast.makeText(getContext(), 
-                    "Add Trip functionality coming soon!", 
-                    android.widget.Toast.LENGTH_SHORT).show();
-            }
+            Intent intent = new Intent(getActivity(), AddTripActivity.class);
+            startActivity(intent);
         });
+
+        // Set click listener for empty state button
+        if (btnAddTrip != null) {
+            btnAddTrip.setOnClickListener(v -> {
+                Intent intent = new Intent(getActivity(), AddTripActivity.class);
+                startActivity(intent);
+            });
+        }
     }
 
     private void updateWelcomeMessage() {
@@ -85,10 +101,40 @@ public class HomeFragment extends Fragment {
         }
     }
 
-    private void onTripClick(/* Trip trip */) {
-        // TODO: Navigate to trip details
-        // Intent intent = new Intent(getActivity(), TripDetailsActivity.class);
-        // intent.putExtra("trip_id", trip.getId());
-        // startActivity(intent);
+    private void observeTrips() {
+        viewModel.getAllTrips().observe(getViewLifecycleOwner(), trips -> {
+            if (trips != null) {
+                // Filter for upcoming trips only
+                List<com.example.mobiledegreefinalproject.database.Trip> upcomingTrips = new ArrayList<>();
+                long currentTime = System.currentTimeMillis();
+
+                for (com.example.mobiledegreefinalproject.database.Trip trip : trips) {
+                    // Show trip if end date is in the future
+                    if (trip.getEndDate() >= currentTime) {
+                        upcomingTrips.add(trip);
+                    }
+                }
+
+                tripsAdapter.submitList(upcomingTrips);
+
+                // Show/hide empty state
+                if (upcomingTrips.isEmpty()) {
+                    tripsRecyclerView.setVisibility(View.GONE);
+                    emptyStateLayout.setVisibility(View.VISIBLE);
+                } else {
+                    tripsRecyclerView.setVisibility(View.VISIBLE);
+                    emptyStateLayout.setVisibility(View.GONE);
+                }
+            }
+        });
     }
-} 
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh data when returning to home fragment
+        if (viewModel != null) {
+            observeTrips();
+        }
+    }
+}

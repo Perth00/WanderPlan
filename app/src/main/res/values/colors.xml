@@ -44,4 +44,9 @@
     <!-- Gradient colors -->
     <color name="gradient_start">#FFB3D9</color>
     <color name="gradient_end">#A8D8EA</color>
+    
+    <!-- Additional UI Colors -->
+    <color name="text_primary">#2C2C2C</color>
+    <color name="text_secondary">#9E9E9E</color>
+    <color name="card_stroke_color">#E0E0E0</color>
 </resources>

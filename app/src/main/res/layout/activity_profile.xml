@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <!-- Header -->
+        <!-- Header (back button removed) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -20,25 +20,14 @@
             android:orientation="horizontal"
             android:layout_marginBottom="32dp">
 
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Back"
-                android:src="@drawable/ic_arrow_back"
-                android:tint="@color/primary"
-                android:clickable="true"
-                android:focusable="true"
-                android:onClick="onBackPressed" />
-
             <TextView
+                android:id="@+id/profile_title"
                 style="@style/WanderPlan.Text.Headline"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="16dp"
                 android:text="Profile"
-                android:textColor="@color/navy" />
+                android:textColor="@color/navy"
+                android:gravity="center" />
 
         </LinearLayout>
 
@@ -224,6 +213,16 @@
                 android:layout_height="56dp"
                 android:layout_marginBottom="16dp"
                 android:text="Save Changes"
+                android:textSize="16sp" />
+
+            <!-- Go Back Button -->
+            <Button
+                android:id="@+id/go_back_button"
+                style="@style/WanderPlan.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="16dp"
+                android:text="Go Back to Previous Page"
                 android:textSize="16sp" />
 
             <!-- Sign Out Button -->
