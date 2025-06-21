@@ -1,10 +1,12 @@
 package com.example.mobiledegreefinalproject;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,7 +30,9 @@ public class TripsFragment extends Fragment {
     private TextView emptyStateText;
     private TripsAdapter tripsAdapter;
     private TripsViewModel viewModel;
-
+    
+    // Info Panel Manager for non-intrusive messages
+    private InfoPanelManager infoPanelManager;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -58,6 +62,15 @@ public class TripsFragment extends Fragment {
         tripsRecyclerView = view.findViewById(R.id.rv_trips);
         fabAddTrip = view.findViewById(R.id.fab_add_trip);
         emptyStateText = view.findViewById(R.id.empty_state_text);
+        
+        // Initialize Info Panel Manager
+        ViewGroup infoPanelContainer = view.findViewById(R.id.info_panel_container);
+        if (infoPanelContainer != null) {
+            infoPanelManager = new InfoPanelManager(getContext(), infoPanelContainer);
+            infoPanelManager.showTripManagementTips();
+        } else {
+            android.util.Log.w("TripsFragment", "Info panel container not found");
+        }
         
         // Debug: Log if views are null
         if (tripsRecyclerView == null) {
@@ -129,12 +142,10 @@ public class TripsFragment extends Fragment {
         }
     }
 
-
-
     private void showDeleteTripDialog(Trip trip) {
         if (getContext() == null) return;
         
-        new android.app.AlertDialog.Builder(getContext())
+        new AlertDialog.Builder(getContext())
                 .setTitle("Delete Trip")
                 .setMessage("Are you sure you want to delete \"" + trip.getTitle() + "\"?\n\nThis will also delete all activities for this trip. This action cannot be undone.")
                 .setPositiveButton("Delete", (dialog, which) -> deleteTrip(trip))
@@ -151,7 +162,7 @@ public class TripsFragment extends Fragment {
         }
         
         // Show loading dialog
-        android.app.AlertDialog progressDialog = new android.app.AlertDialog.Builder(getContext())
+        AlertDialog progressDialog = new AlertDialog.Builder(getContext())
             .setMessage("Deleting trip...")
             .setCancelable(false)
             .create();
@@ -182,7 +193,9 @@ public class TripsFragment extends Fragment {
                 }
                 
                 if (getContext() != null) {
-                    Toast.makeText(getContext(), "Trip \"" + trip.getTitle() + "\" deleted successfully", Toast.LENGTH_SHORT).show();
+                    if (infoPanelManager != null) {
+                        infoPanelManager.addCustomMessage("Trip \"" + trip.getTitle() + "\" deleted successfully", false);
+                    }
                 }
                 
                 android.util.Log.d("TripsFragment", "Trip deleted successfully: " + trip.getTitle());
@@ -213,7 +226,7 @@ public class TripsFragment extends Fragment {
                 
                 if (getContext() != null) {
                     try {
-                        new android.app.AlertDialog.Builder(getContext())
+                        new AlertDialog.Builder(getContext())
                                 .setTitle("Delete Failed")
                                 .setMessage("Failed to delete trip: " + error)
                                 .setPositiveButton("OK", null)

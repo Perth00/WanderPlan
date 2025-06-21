@@ -20,7 +20,7 @@
                 android:layout_height="wrap_content"
                 android:layout_margin="16dp"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
+                app:cardElevation="6dp"
                 app:strokeColor="@color/card_stroke_color"
                 app:strokeWidth="0.5dp">
 
@@ -28,7 +28,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="20dp">
+                    android:padding="24dp">
 
                     <!-- Trip Title and Destination -->
                     <TextView
@@ -36,37 +36,47 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Trip to Tokyo"
-                        android:textSize="24sp"
+                        android:textSize="26sp"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary"
-                        android:layout_marginBottom="8dp" />
+                        android:layout_marginBottom="12dp"
+                        android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:id="@+id/trip_destination"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Tokyo, Japan"
-                        android:textSize="16sp"
+                        android:textSize="18sp"
                         android:textColor="@color/text_secondary"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="16dp"
                         android:drawableStart="@drawable/ic_trips"
-                        android:drawablePadding="8dp"
-                        android:gravity="center_vertical" />
+                        android:drawablePadding="10dp"
+                        android:gravity="center_vertical"
+                        app:drawableTint="@color/secondary" />
 
                     <TextView
                         android:id="@+id/trip_date_range"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Dec 15, 2024 - Dec 22, 2024"
-                        android:textSize="14sp"
+                        android:textSize="16sp"
                         android:textColor="@color/text_secondary"
                         android:drawableStart="@drawable/ic_budget"
-                        android:drawablePadding="8dp"
-                        android:gravity="center_vertical" />
+                        android:drawablePadding="10dp"
+                        android:gravity="center_vertical"
+                        app:drawableTint="@color/primary" />
 
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- Info Panel -->
+            <include
+                android:id="@+id/info_panel_container"
+                layout="@layout/info_panel_strip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
 
             <!-- Timeline Section -->
             <LinearLayout
@@ -80,17 +90,21 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Itinerary"
-                    android:textSize="20sp"
+                    android:textSize="22sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
-                    android:layout_marginBottom="16dp" />
+                    android:layout_marginBottom="20dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:paddingHorizontal="4dp" />
 
                 <!-- Timeline RecyclerView -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/timeline_recycler_view"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false" />
+                    android:nestedScrollingEnabled="false"
+                    android:clipToPadding="false"
+                    android:paddingTop="4dp" />
 
                 <!-- Empty State -->
                 <TextView
@@ -98,10 +112,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="No activities planned yet.\nTap + to add your first activity!"
-                    android:textSize="14sp"
+                    android:textSize="16sp"
                     android:textColor="@color/text_secondary"
                     android:gravity="center"
-                    android:padding="32dp"
+                    android:padding="40dp"
+                    android:fontFamily="sans-serif"
+                    android:lineSpacingExtra="4dp"
                     android:visibility="gone" />
 
             </LinearLayout>
@@ -112,7 +128,7 @@
                 android:layout_height="wrap_content"
                 android:layout_margin="16dp"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
+                app:cardElevation="6dp"
                 app:strokeColor="@color/card_stroke_color"
                 app:strokeWidth="0.5dp">
 
@@ -120,29 +136,30 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="20dp">
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Location"
-                        android:textSize="16sp"
+                        android:textSize="18sp"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary"
-                        android:layout_marginBottom="12dp" />
+                        android:layout_marginBottom="16dp"
+                        android:fontFamily="sans-serif-medium" />
 
                     <ImageView
                         android:id="@+id/map_preview"
                         android:layout_width="match_parent"
-                        android:layout_height="200dp"
+                        android:layout_height="180dp"
                         android:background="@drawable/bg_rounded_card"
-                        android:backgroundTint="@color/background_light"
+                        android:backgroundTint="@color/surface_light"
                         android:scaleType="centerCrop"
-                        android:contentDescription="Map preview"
+                        android:contentDescription="@string/map_preview"
                         android:src="@drawable/ic_trips"
-                        android:padding="64dp"
+                        android:padding="50dp"
                         app:tint="@color/medium_grey"
-                        android:alpha="0.5"
+                        android:alpha="0.6"
                         android:clickable="true"
                         android:focusable="true"
                         android:foreground="?android:attr/selectableItemBackground" />
