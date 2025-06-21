@@ -47,17 +47,30 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        
+        // Check if activity is finishing to prevent crashes during logout
+        if (isFinishing()) {
+            android.util.Log.w("MainActivity", "Activity is finishing - skipping onResume operations");
+            return;
+        }
+        
         // Refresh user data when app becomes active
         if (userManager != null && userManager.isLoggedIn()) {
             userManager.syncUserDataFromFirebase(new UserManager.OnDataSyncListener() {
                 @Override
                 public void onSuccess() {
-                    android.util.Log.d("MainActivity", "User data refreshed successfully on resume");
+                    // Check if activity is still valid
+                    if (!isFinishing() && !isDestroyed()) {
+                        android.util.Log.d("MainActivity", "User data refreshed successfully on resume");
+                    }
                 }
 
                 @Override
                 public void onError(String error) {
-                    android.util.Log.w("MainActivity", "Failed to refresh user data on resume: " + error);
+                    // Check if activity is still valid before logging
+                    if (!isFinishing() && !isDestroyed()) {
+                        android.util.Log.w("MainActivity", "Failed to refresh user data on resume: " + error);
+                    }
                 }
             });
         }
@@ -69,6 +82,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupBottomNavigation() {
         bottomNavigation.setOnItemSelectedListener(item -> {
+            // Check if activity is finishing to prevent crashes
+            if (isFinishing()) {
+                android.util.Log.w("MainActivity", "Activity is finishing - ignoring navigation");
+                return false;
+            }
+            
             Fragment selectedFragment = null;
             int itemId = item.getItemId();
 
@@ -83,24 +102,40 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (selectedFragment != null) {
-                getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.fragment_container, selectedFragment)
-                        .commit();
-                return true;
+                try {
+                    getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.fragment_container, selectedFragment)
+                            .commit();
+                    return true;
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "Error replacing fragment", e);
+                    return false;
+                }
             }
             return false;
         });
     }
 
     public String getUserName() {
-        return userManager.getUserName();
+        return userManager != null ? userManager.getUserName() : "Guest";
     }
 
     public void setUserName(String userName) {
-        userManager.setUserName(userName);
+        if (userManager != null) {
+            userManager.setUserName(userName);
+        }
     }
     
     public UserManager getUserManager() {
         return userManager;
-    }}
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        android.util.Log.d("MainActivity", "MainActivity destroyed - cleaning up");
+        // Clear references to prevent memory leaks
+        userManager = null;
+    }
+}

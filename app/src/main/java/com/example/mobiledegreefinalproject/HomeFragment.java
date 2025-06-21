@@ -67,12 +67,19 @@ public class HomeFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
+        // Create a read-only adapter for home page (no delete functionality)
         tripsAdapter = new TripsAdapter(trip -> {
             // Navigate to trip detail
             Intent intent = new Intent(getContext(), TripDetailActivity.class);
             intent.putExtra("trip_id", trip.getId());
             startActivity(intent);
         });
+        
+        // Disable delete mode for home page
+        tripsAdapter.setDeleteMode(false);
+        
+        // No long press listener for home page (read-only)
+        // tripsAdapter.setOnTripLongClickListener(...); // Intentionally commented out
 
         tripsRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         tripsRecyclerView.setAdapter(tripsAdapter);
@@ -102,28 +109,42 @@ public class HomeFragment extends Fragment {
     }
 
     private void observeTrips() {
+        if (viewModel == null) return;
+        
         viewModel.getAllTrips().observe(getViewLifecycleOwner(), trips -> {
-            if (trips != null) {
-                // Filter for upcoming trips only
-                List<com.example.mobiledegreefinalproject.database.Trip> upcomingTrips = new ArrayList<>();
-                long currentTime = System.currentTimeMillis();
+            // Check if fragment is still in valid state
+            if (!isAdded() || getActivity() == null || getActivity().isFinishing() || getContext() == null) {
+                android.util.Log.w("HomeFragment", "Fragment not in valid state for trips update");
+                return;
+            }
+            
+            if (trips != null && tripsAdapter != null) {
+                try {
+                    // Filter for upcoming trips only
+                    List<com.example.mobiledegreefinalproject.database.Trip> upcomingTrips = new ArrayList<>();
+                    long currentTime = System.currentTimeMillis();
 
-                for (com.example.mobiledegreefinalproject.database.Trip trip : trips) {
-                    // Show trip if end date is in the future
-                    if (trip.getEndDate() >= currentTime) {
-                        upcomingTrips.add(trip);
+                    for (com.example.mobiledegreefinalproject.database.Trip trip : trips) {
+                        // Show trip if end date is in the future
+                        if (trip.getEndDate() >= currentTime) {
+                            upcomingTrips.add(trip);
+                        }
                     }
-                }
 
-                tripsAdapter.submitList(upcomingTrips);
+                    tripsAdapter.submitList(upcomingTrips);
 
-                // Show/hide empty state
-                if (upcomingTrips.isEmpty()) {
-                    tripsRecyclerView.setVisibility(View.GONE);
-                    emptyStateLayout.setVisibility(View.VISIBLE);
-                } else {
-                    tripsRecyclerView.setVisibility(View.VISIBLE);
-                    emptyStateLayout.setVisibility(View.GONE);
+                    // Show/hide empty state
+                    if (tripsRecyclerView != null && emptyStateLayout != null) {
+                        if (upcomingTrips.isEmpty()) {
+                            tripsRecyclerView.setVisibility(View.GONE);
+                            emptyStateLayout.setVisibility(View.VISIBLE);
+                        } else {
+                            tripsRecyclerView.setVisibility(View.VISIBLE);
+                            emptyStateLayout.setVisibility(View.GONE);
+                        }
+                    }
+                } catch (Exception e) {
+                    android.util.Log.e("HomeFragment", "Error updating trips list", e);
                 }
             }
         });
@@ -133,6 +154,12 @@ public class HomeFragment extends Fragment {
     public void onResume() {
         super.onResume();
         android.util.Log.d("HomeFragment", "onResume called - running duplicate cleanup");
+        
+        // Check if fragment is in valid state
+        if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+            android.util.Log.w("HomeFragment", "Fragment not in valid state for cleanup");
+            return;
+        }
         
         // Clean up any duplicates when the fragment becomes visible
         if (viewModel != null) {
@@ -151,5 +178,14 @@ public class HomeFragment extends Fragment {
             // Refresh data when returning to home fragment
             observeTrips();
         }
+    }
+    
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        android.util.Log.d("HomeFragment", "onDestroy called - cleaning up");
+        // Clear references to prevent memory leaks
+        tripsAdapter = null;
+        viewModel = null;
     }
 }

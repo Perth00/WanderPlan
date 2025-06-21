@@ -40,8 +40,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:paddingHorizontal="16dp"
-                    android:paddingBottom="16dp"
+                    android:paddingBottom="4dp"
                     android:text="Upcoming Adventures" />
+
+                <!-- Explanatory Text -->
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="16dp"
+                    android:text="View your upcoming trips here. To edit or delete trips, go to 'My Trips' tab."
+                    android:textColor="@color/medium_grey"
+                    android:textSize="14sp" />
 
             </LinearLayout>
 
