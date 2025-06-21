@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_light"
@@ -78,7 +79,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Edit profile"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
             </LinearLayout>
 
@@ -106,7 +107,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="@string/theme"
                     android:src="@drawable/ic_settings"
-                    android:tint="@color/primary" />
+                    app:tint="@color/primary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -120,7 +121,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Change theme"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
             </LinearLayout>
 
@@ -147,7 +148,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="@string/feedback"
                     android:src="@drawable/ic_home"
-                    android:tint="@color/primary" />
+                    app:tint="@color/primary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -161,7 +162,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Send feedback"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
             </LinearLayout>
 
@@ -188,7 +189,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="@string/about"
                     android:src="@drawable/ic_trips"
-                    android:tint="@color/primary" />
+                    app:tint="@color/primary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -202,7 +203,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="About app"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
             </LinearLayout>
 
@@ -229,7 +230,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="Login"
                     android:src="@drawable/ic_lock"
-                    android:tint="@color/primary" />
+                    app:tint="@color/primary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -243,7 +244,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Go to login"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
             </LinearLayout>
 
@@ -270,7 +271,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="Register"
                     android:src="@drawable/ic_person"
-                    android:tint="@color/primary" />
+                    app:tint="@color/primary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -284,7 +285,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Go to register"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
             </LinearLayout>
 
@@ -314,7 +315,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="Logout"
                     android:src="@drawable/ic_arrow_back"
-                    android:tint="@color/error" />
+                    app:tint="@color/error" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -329,7 +330,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Sign out"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/error" />
+                    app:tint="@color/error" />
 
             </LinearLayout>
 
@@ -347,3 +348,4 @@
     </LinearLayout>
 
 </ScrollView> 
+

@@ -6,6 +6,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -15,6 +16,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.mobiledegreefinalproject.adapter.TripsAdapter;
+import com.example.mobiledegreefinalproject.database.Trip;
+import com.example.mobiledegreefinalproject.repository.TripRepository;
 import com.example.mobiledegreefinalproject.viewmodel.TripsViewModel;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
@@ -25,6 +28,7 @@ public class TripsFragment extends Fragment {
     private TextView emptyStateText;
     private TripsAdapter tripsAdapter;
     private TripsViewModel viewModel;
+
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -72,20 +76,33 @@ public class TripsFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
-        tripsAdapter = new TripsAdapter(trip -> {
-            try {
-                // Navigate to trip detail
-                Intent intent = new Intent(getContext(), TripDetailActivity.class);
-                intent.putExtra("trip_id", trip.getId());
-                startActivity(intent);
-            } catch (Exception e) {
-                android.util.Log.e("TripsFragment", "Error starting TripDetailActivity", e);
-                if (getContext() != null) {
-                    android.widget.Toast.makeText(getContext(), 
-                        "Error opening trip details", 
-                        android.widget.Toast.LENGTH_SHORT).show();
+        tripsAdapter = new TripsAdapter(
+            // Click listener for opening trip details
+            trip -> {
+                try {
+                    // Navigate to trip detail
+                    Intent intent = new Intent(getContext(), TripDetailActivity.class);
+                    intent.putExtra("trip_id", trip.getId());
+                    startActivity(intent);
+                } catch (Exception e) {
+                    android.util.Log.e("TripsFragment", "Error starting TripDetailActivity", e);
+                    if (getContext() != null) {
+                        android.widget.Toast.makeText(getContext(), 
+                            "Error opening trip details", 
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    }
                 }
+            },
+            // Delete listener for deleting trips (when delete button is clicked)
+            trip -> {
+                showDeleteTripDialog(trip);
             }
+        );
+        
+        // Add long click listener to directly show delete dialog
+        tripsAdapter.setOnLongClickListener(trip -> {
+            showDeleteTripDialog(trip);
+            return true;
         });
         
         if (tripsRecyclerView != null) {
@@ -110,6 +127,64 @@ public class TripsFragment extends Fragment {
                 }
             });
         }
+    }
+
+
+
+    private void showDeleteTripDialog(Trip trip) {
+        if (getContext() == null) return;
+        
+        new android.app.AlertDialog.Builder(getContext())
+                .setTitle("Delete Trip")
+                .setMessage("Are you sure you want to delete \"" + trip.getTitle() + "\"?\n\nThis will also delete all activities for this trip. This action cannot be undone.")
+                .setPositiveButton("Delete", (dialog, which) -> deleteTrip(trip))
+                .setNegativeButton("Cancel", null)
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+
+    private void deleteTrip(Trip trip) {
+        if (getContext() == null) return;
+        
+        // Show loading dialog
+        android.app.AlertDialog progressDialog = new android.app.AlertDialog.Builder(getContext())
+            .setMessage("Deleting trip...")
+            .setCancelable(false)
+            .create();
+        progressDialog.show();
+        
+        viewModel.deleteTrip(trip, new TripRepository.OnTripOperationListener() {
+            @Override
+            public void onSuccess(int tripId) {
+                if (progressDialog.isShowing()) {
+                    progressDialog.dismiss();
+                }
+                
+                if (getContext() != null) {
+                    Toast.makeText(getContext(), "Trip \"" + trip.getTitle() + "\" deleted successfully", Toast.LENGTH_SHORT).show();
+                }
+                
+                android.util.Log.d("TripsFragment", "Trip deleted successfully: " + trip.getTitle());
+            }
+            
+            @Override
+            public void onError(String error) {
+                if (progressDialog.isShowing()) {
+                    progressDialog.dismiss();
+                }
+                
+                if (getContext() != null) {
+                    new android.app.AlertDialog.Builder(getContext())
+                            .setTitle("Delete Failed")
+                            .setMessage("Failed to delete trip: " + error)
+                            .setPositiveButton("OK", null)
+                            .setIcon(android.R.drawable.ic_dialog_alert)
+                            .show();
+                }
+                
+                android.util.Log.e("TripsFragment", "Failed to delete trip: " + error);
+            }
+        });
     }
 
     private void observeTrips() {

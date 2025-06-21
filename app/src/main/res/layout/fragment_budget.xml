@@ -169,7 +169,7 @@
                     android:alpha="0.5"
                     android:contentDescription="No expenses"
                     android:src="@drawable/ic_budget"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -198,3 +198,4 @@
         app:srcCompat="@drawable/ic_add" />
 
 </RelativeLayout> 
+

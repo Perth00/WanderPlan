@@ -21,7 +21,7 @@
             android:layout_marginBottom="24dp"
             android:contentDescription="@string/app_name"
             android:src="@drawable/ic_trips"
-            android:tint="@color/primary" />
+            app:tint="@color/primary" />
 
         <!-- Welcome Text -->
         <TextView
@@ -89,7 +89,7 @@
                 android:contentDescription="Toggle password visibility"
                 android:padding="4dp"
                 android:src="@drawable/ic_visibility_off"
-                android:tint="@color/medium_grey" />
+                app:tint="@color/medium_grey" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -164,3 +164,4 @@
     </LinearLayout>
 
 </ScrollView> 
+

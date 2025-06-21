@@ -64,7 +64,7 @@
                     android:contentDescription="Edit profile picture"
                     android:padding="8dp"
                     android:src="@drawable/ic_add"
-                    android:tint="@color/white" />
+                    app:tint="@color/white" />
 
             </FrameLayout>
 
@@ -125,7 +125,7 @@
                         android:layout_marginEnd="12dp"
                         android:contentDescription="Email"
                         android:src="@drawable/ic_email"
-                        android:tint="@color/primary" />
+                        app:tint="@color/primary" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -166,7 +166,7 @@
                         android:layout_marginEnd="12dp"
                         android:contentDescription="Account type"
                         android:src="@drawable/ic_settings"
-                        android:tint="@color/primary" />
+                        app:tint="@color/primary" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -187,7 +187,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="✅ Synced Account"
+                            android:text="✓ Synced Account"
                             android:textColor="@color/success"
                             android:textStyle="bold" />
 
@@ -275,3 +275,4 @@
     </LinearLayout>
 
 </ScrollView> 
+

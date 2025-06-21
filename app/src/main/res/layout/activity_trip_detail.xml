@@ -141,7 +141,7 @@
                         android:contentDescription="Map preview"
                         android:src="@drawable/ic_trips"
                         android:padding="64dp"
-                        android:tint="@color/medium_grey"
+                        app:tint="@color/medium_grey"
                         android:alpha="0.5"
                         android:clickable="true"
                         android:focusable="true"
@@ -172,3 +172,4 @@
         style="@style/WanderPlan.FAB" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout> 
+
