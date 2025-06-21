@@ -179,27 +179,80 @@ public class AddTripActivity extends AppCompatActivity {
             Log.d(TAG, "Saving trip: " + title + ", " + destination + ", " + 
                   startCalendar.getTimeInMillis() + " to " + endCalendar.getTimeInMillis());
             
-            // Save trip
+            // Add safeguards for ViewModel and repository
+            if (viewModel == null) {
+                Log.e(TAG, "ViewModel is null - reinitializing");
+                setupViewModel();
+                if (viewModel == null) {
+                    setLoadingState(false);
+                    Toast.makeText(this, "App error: Unable to initialize data handler", Toast.LENGTH_LONG).show();
+                    return;
+                }
+            }
+            
+            // Save trip with enhanced error handling
             viewModel.insertTrip(trip, new TripRepository.OnTripOperationListener() {
                 @Override
                 public void onSuccess(int tripId) {
+                    // Ensure we're on UI thread
+                    if (AddTripActivity.this.isDestroyed() || AddTripActivity.this.isFinishing()) {
+                        Log.w(TAG, "Activity is destroyed/finishing, ignoring success callback");
+                        return;
+                    }
+                    
                     runOnUiThread(() -> {
-                        setLoadingState(false);
-                        Log.d(TAG, "Trip saved successfully with ID: " + tripId);
-                        Toast.makeText(AddTripActivity.this, "Trip saved successfully!", Toast.LENGTH_SHORT).show();
-                        
-                        // Navigate to trip detail
-                        // For now, just finish the activity
-                        finish();
+                        try {
+                            setLoadingState(false);
+                            Log.d(TAG, "Trip saved successfully with ID: " + tripId);
+                            Toast.makeText(AddTripActivity.this, "Trip saved successfully!", Toast.LENGTH_SHORT).show();
+                            
+                            // Add small delay to ensure UI updates complete before finishing
+                            new android.os.Handler().postDelayed(() -> {
+                                if (!AddTripActivity.this.isDestroyed() && !AddTripActivity.this.isFinishing()) {
+                                    finish();
+                                }
+                            }, 500);
+                            
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error in success callback UI updates", e);
+                            // Still try to finish the activity
+                            if (!AddTripActivity.this.isDestroyed() && !AddTripActivity.this.isFinishing()) {
+                                finish();
+                            }
+                        }
                     });
                 }
                 
                 @Override
                 public void onError(String error) {
+                    // Ensure we're on UI thread
+                    if (AddTripActivity.this.isDestroyed() || AddTripActivity.this.isFinishing()) {
+                        Log.w(TAG, "Activity is destroyed/finishing, ignoring error callback");
+                        return;
+                    }
+                    
                     runOnUiThread(() -> {
-                        setLoadingState(false);
-                        Log.e(TAG, "Detailed error saving trip: " + error);
-                        Toast.makeText(AddTripActivity.this, "Failed to save trip: " + error, Toast.LENGTH_LONG).show();
+                        try {
+                            setLoadingState(false);
+                            Log.e(TAG, "Detailed error saving trip: " + error);
+                            
+                            // Show user-friendly error message
+                            String userMessage = "Failed to save trip";
+                            if (error != null) {
+                                if (error.contains("network") || error.contains("connection")) {
+                                    userMessage = "Network error - trip saved locally";
+                                } else if (error.contains("Firebase") || error.contains("sync")) {
+                                    userMessage = "Sync error - trip saved locally";
+                                } else {
+                                    userMessage = "Error: " + error;
+                                }
+                            }
+                            
+                            Toast.makeText(AddTripActivity.this, userMessage, Toast.LENGTH_LONG).show();
+                            
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error in error callback UI updates", e);
+                        }
                     });
                 }
             });
@@ -210,27 +263,56 @@ public class AddTripActivity extends AppCompatActivity {
             Toast.makeText(this, "Validation error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             setLoadingState(false);
-            Log.e(TAG, "Unexpected error creating trip: " + e.getMessage());
-            Toast.makeText(this, "Unexpected error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Unexpected error creating trip: " + e.getMessage(), e);
+            Toast.makeText(this, "Unexpected error occurred. Please try again.", Toast.LENGTH_LONG).show();
         }
     }
     
     private void setLoadingState(boolean loading) {
-        progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-        btnSaveTrip.setEnabled(!loading);
-        btnStartDate.setEnabled(!loading);
-        btnEndDate.setEnabled(!loading);
-        editTripTitle.setEnabled(!loading);
-        editDestination.setEnabled(!loading);
+        try {
+            if (progressBar != null) {
+                progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
+            }
+            if (btnSaveTrip != null) {
+                btnSaveTrip.setEnabled(!loading);
+            }
+            if (btnStartDate != null) {
+                btnStartDate.setEnabled(!loading);
+            }
+            if (btnEndDate != null) {
+                btnEndDate.setEnabled(!loading);
+            }
+            if (editTripTitle != null) {
+                editTripTitle.setEnabled(!loading);
+            }
+            if (editDestination != null) {
+                editDestination.setEnabled(!loading);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating loading state", e);
+        }
     }
     
     private void testDatabaseConnection() {
-        Log.d(TAG, "Testing database connection...");
-        // This will initialize the database and repository
-        if (viewModel != null) {
-            Log.d(TAG, "ViewModel initialized successfully");
-        } else {
-            Log.e(TAG, "Failed to initialize ViewModel");
+        try {
+            Log.d(TAG, "Testing database connection...");
+            // This will initialize the database and repository
+            if (viewModel != null) {
+                Log.d(TAG, "ViewModel initialized successfully");
+            } else {
+                Log.e(TAG, "Failed to initialize ViewModel");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error testing database connection", e);
+        }
+    }
+    
+    @Override
+    protected void onDestroy() {
+        try {
+            super.onDestroy();
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onDestroy", e);
         }
     }
 } 

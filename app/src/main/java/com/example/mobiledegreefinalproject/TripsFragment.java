@@ -132,4 +132,25 @@ public class TripsFragment extends Fragment {
             }
         });
     }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        android.util.Log.d("TripsFragment", "onResume called - running duplicate cleanup");
+        
+        // Clean up any duplicates when the fragment becomes visible
+        if (viewModel != null) {
+            viewModel.cleanupDuplicateTrips(new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
+                @Override
+                public void onSuccess() {
+                    android.util.Log.d("TripsFragment", "Duplicate cleanup completed successfully");
+                }
+                
+                @Override
+                public void onError(String error) {
+                    android.util.Log.w("TripsFragment", "Duplicate cleanup failed: " + error);
+                }
+            });
+        }
+    }
 }
