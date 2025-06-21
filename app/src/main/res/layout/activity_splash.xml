@@ -16,7 +16,7 @@
         android:layout_marginBottom="24dp"
         android:contentDescription="@string/app_name"
         android:src="@drawable/ic_trips"
-        android:tint="@color/white" />
+        app:tint="@color/white" />
 
     <!-- App Name -->
     <TextView
@@ -50,3 +50,4 @@
         android:indeterminateTint="@color/white" />
 
 </LinearLayout> 
+

@@ -69,7 +69,7 @@
                     android:alpha="0.5"
                     android:contentDescription="@string/no_trips_message"
                     android:src="@drawable/ic_trips"
-                    android:tint="@color/medium_grey" />
+                    app:tint="@color/medium_grey" />
 
                 <!-- Empty State Message -->
                 <TextView
@@ -109,3 +109,4 @@
         app:srcCompat="@drawable/ic_add" />
 
 </RelativeLayout> 
+

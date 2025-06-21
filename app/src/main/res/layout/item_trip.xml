@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="16dp"
@@ -36,23 +37,23 @@
                     android:id="@+id/trip_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Trip to Tokyo"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
                     android:maxLines="1"
-                    android:ellipsize="end" />
+                    android:ellipsize="end"
+                    tools:text="Trip to Tokyo" />
 
                 <TextView
                     android:id="@+id/trip_destination"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Tokyo, Japan"
                     android:textSize="14sp"
                     android:textColor="@color/text_secondary"
                     android:layout_marginTop="2dp"
                     android:maxLines="1"
-                    android:ellipsize="end" />
+                    android:ellipsize="end"
+                    tools:text="Tokyo, Japan" />
 
             </LinearLayout>
 
@@ -60,14 +61,25 @@
                 android:id="@+id/trip_duration"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="7 days"
                 android:textSize="12sp"
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:background="@drawable/bg_rounded_card"
                 android:backgroundTint="@color/primary_light"
                 android:paddingHorizontal="8dp"
-                android:paddingVertical="4dp" />
+                android:paddingVertical="4dp"
+                android:layout_marginEnd="8dp"
+                tools:text="7 days" />
+
+            <ImageButton
+                android:id="@+id/btn_delete_trip"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_menu_delete"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/delete_trip"
+                app:tint="@color/text_secondary"
+                android:visibility="gone" />
 
         </LinearLayout>
 
@@ -76,13 +88,13 @@
             android:id="@+id/trip_date_range"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Dec 15, 2024 - Dec 22, 2024"
             android:textSize="13sp"
             android:textColor="@color/text_secondary"
             android:layout_marginBottom="12dp"
             android:drawableStart="@drawable/ic_budget"
             android:drawablePadding="6dp"
-            android:gravity="center_vertical" />
+            android:gravity="center_vertical"
+            tools:text="Dec 15, 2024 - Dec 22, 2024" />
 
         <!-- Map Preview -->
         <ImageView
@@ -92,12 +104,13 @@
             android:background="@drawable/bg_rounded_card"
             android:backgroundTint="@color/background_light"
             android:scaleType="centerCrop"
-            android:contentDescription="Map preview"
+            android:contentDescription="@string/map_preview"
             android:src="@drawable/ic_trips"
             android:padding="32dp"
-            android:tint="@color/medium_grey"
+            app:tint="@color/medium_grey"
             android:alpha="0.5" />
 
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView> 
+

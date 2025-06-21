@@ -5,6 +5,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.ImageButton;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -20,11 +21,41 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
         void onTripClick(Trip trip);
     }
     
-    private final OnTripClickListener clickListener;
+    public interface OnTripDeleteListener {
+        void onTripDelete(Trip trip);
+    }
     
-    public TripsAdapter(OnTripClickListener clickListener) {
+    public interface OnTripLongClickListener {
+        boolean onTripLongClick(Trip trip);
+    }
+    
+    private final OnTripClickListener clickListener;
+    private final OnTripDeleteListener deleteListener;
+    private OnTripLongClickListener longClickListener;
+    private boolean deleteMode = false;
+    
+    public TripsAdapter(OnTripClickListener clickListener, OnTripDeleteListener deleteListener) {
         super(DIFF_CALLBACK);
         this.clickListener = clickListener;
+        this.deleteListener = deleteListener;
+    }
+    
+    // Keep the old constructor for backward compatibility
+    public TripsAdapter(OnTripClickListener clickListener) {
+        this(clickListener, null);
+    }
+    
+    public void setOnLongClickListener(OnTripLongClickListener longClickListener) {
+        this.longClickListener = longClickListener;
+    }
+    
+    public void setDeleteMode(boolean deleteMode) {
+        this.deleteMode = deleteMode;
+        notifyDataSetChanged(); // Refresh all items to show/hide delete buttons
+    }
+    
+    public boolean isDeleteMode() {
+        return deleteMode;
     }
     
     private static final DiffUtil.ItemCallback<Trip> DIFF_CALLBACK = new DiffUtil.ItemCallback<Trip>() {
@@ -53,7 +84,7 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
     @Override
     public void onBindViewHolder(@NonNull TripViewHolder holder, int position) {
         Trip trip = getItem(position);
-        holder.bind(trip, clickListener);
+        holder.bind(trip, clickListener, deleteListener, longClickListener, deleteMode);
     }
     
     static class TripViewHolder extends RecyclerView.ViewHolder {
@@ -62,6 +93,7 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
         private final TextView dateRangeText;
         private final TextView durationText;
         private final ImageView mapPreview;
+        private final ImageButton deleteButton;
         
         public TripViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -70,9 +102,10 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
             dateRangeText = itemView.findViewById(R.id.trip_date_range);
             durationText = itemView.findViewById(R.id.trip_duration);
             mapPreview = itemView.findViewById(R.id.trip_map_preview);
+            deleteButton = itemView.findViewById(R.id.btn_delete_trip);
         }
         
-        public void bind(Trip trip, OnTripClickListener clickListener) {
+        public void bind(Trip trip, OnTripClickListener clickListener, OnTripDeleteListener deleteListener, OnTripLongClickListener longClickListener, boolean deleteMode) {
             titleText.setText(trip.getTitle());
             destinationText.setText(trip.getDestination());
             dateRangeText.setText(trip.getDateRange());
@@ -80,12 +113,30 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
             int days = trip.getDurationDays();
             durationText.setText(days + (days == 1 ? " day" : " days"));
             
-            // Set click listener
+            // Set click listener for the main item
             itemView.setOnClickListener(v -> {
                 if (clickListener != null) {
                     clickListener.onTripClick(trip);
                 }
             });
+            
+            // Set long click listener
+            itemView.setOnLongClickListener(v -> {
+                if (longClickListener != null) {
+                    return longClickListener.onTripLongClick(trip);
+                }
+                return false;
+            });
+            
+            // Set up delete button
+            if (deleteButton != null) {
+                deleteButton.setVisibility((deleteMode && deleteListener != null) ? View.VISIBLE : View.GONE);
+                deleteButton.setOnClickListener(v -> {
+                    if (deleteListener != null) {
+                        deleteListener.onTripDelete(trip);
+                    }
+                });
+            }
             
             // TODO: Load map preview image using Glide when map URLs are available
             // For now, show a placeholder
