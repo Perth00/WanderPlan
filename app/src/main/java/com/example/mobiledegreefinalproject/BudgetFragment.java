@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -70,6 +71,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
     private PieChart pieChart;
     private ChipGroup chipGroupCategories;
     private LinearLayout emptyStateLayout;
+    private ImageView editBudgetIcon;
     
     // Trip Selector Components
     private LinearLayout tripSelectorLayout;
@@ -118,6 +120,8 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             updateChartData();
             // Ensure FAB is always visible from the start
             updateFabVisibility();
+            // Update edit budget icon visibility
+            updateEditBudgetIconVisibility();
         } catch (Exception e) {
             Log.e(TAG, "Error in onViewCreated", e);
             showErrorToast("Error initializing budget page");
@@ -154,6 +158,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
         pieChart = view.findViewById(R.id.pie_chart_expenses);
         chipGroupCategories = view.findViewById(R.id.chip_group_categories);
         emptyStateLayout = view.findViewById(R.id.layout_empty_state);
+        editBudgetIcon = view.findViewById(R.id.iv_edit_budget);
         
         // Trip selector components
         tripSelectorLayout = view.findViewById(R.id.layout_trip_selector);
@@ -362,6 +367,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             totalBudgetText.setOnClickListener(v -> showBudgetSetupDialog());
         }
         
+        // Edit budget icon click listener
+        if (editBudgetIcon != null) {
+            editBudgetIcon.setOnClickListener(v -> showBudgetSetupDialog());
+        }
+        
         // Trip selector click listener
         if (tripSelectorLayout != null) {
             tripSelectorLayout.setOnClickListener(v -> showTripSelectorDialog());
@@ -370,6 +380,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
 
     private void updateBudgetDisplay() {
         try {
+            // If "All Trips" is selected, always recalculate the total budget
+            if (selectedTrip == null) {
+                totalBudget = calculateTotalBudgetAllTrips();
+            }
+            
             double totalSpent = calculateTotalSpent();
             double remaining = totalBudget - totalSpent;
             
@@ -1083,8 +1098,13 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
         
         try {
             AlertDialog.Builder builder = new AlertDialog.Builder(context);
-            builder.setTitle("💰 Set Your Budget");
-            builder.setMessage("Set your total budget and add default categories");
+            if (selectedTrip == null) {
+                builder.setTitle("💰 Total Budget Overview");
+                builder.setMessage("This shows the combined budget from all your trips. To edit budgets, select a specific trip.");
+            } else {
+                builder.setTitle("💰 Set Trip Budget");
+                builder.setMessage("Set the budget for \"" + selectedTrip.getTitle() + "\" and add default categories");
+            }
             
             LinearLayout layout = new LinearLayout(context);
             layout.setOrientation(LinearLayout.VERTICAL);
@@ -1092,14 +1112,30 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             
             // Budget input
             TextView budgetLabel = new TextView(context);
-            budgetLabel.setText("Total Budget (RM):");
+            if (selectedTrip == null) {
+                budgetLabel.setText("Total Budget (All Trips) - Read Only:");
+            } else {
+                budgetLabel.setText("Total Budget (RM):");
+            }
             budgetLabel.setPadding(0, 0, 0, 8);
             layout.addView(budgetLabel);
             
             EditText budgetInput = new EditText(context);
-            budgetInput.setHint("Enter your budget (e.g., 2000)");
-            budgetInput.setText(String.valueOf((int)totalBudget));
-            budgetInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            
+            if (selectedTrip == null) {
+                // "All Trips" selected - make budget read-only and show sum of all trip budgets
+                double calculatedTotal = calculateTotalBudgetAllTrips();
+                budgetInput.setText(String.format("%.0f (Sum of all trip budgets)", calculatedTotal));
+                budgetInput.setEnabled(false); // Make it read-only
+                budgetInput.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
+                budgetInput.setBackgroundColor(ContextCompat.getColor(context, R.color.background_light));
+            } else {
+                // Specific trip selected - allow editing
+                budgetInput.setHint("Enter your budget (e.g., 2000)");
+                budgetInput.setText(String.valueOf((int)totalBudget));
+                budgetInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            }
+            
             layout.addView(budgetInput);
             
             // Add default categories checkbox - ONLY for specific trips, NOT for "All Trips"
@@ -1159,16 +1195,22 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             // Make the checkbox final so it can be accessed in the lambda
             final android.widget.CheckBox finalAddDefaultsCheckbox = addDefaultsCheckbox;
             
-            builder.setPositiveButton("Set Budget", (dialog, which) -> {
+            String buttonText = selectedTrip == null ? "OK" : "Set Budget";
+            builder.setPositiveButton(buttonText, (dialog, which) -> {
                 try {
+                    if (selectedTrip == null) {
+                        // "All Trips" selected - budget is read-only, just show info message
+                        showErrorToast("Total budget is automatically calculated from all trip budgets");
+                        return;
+                    }
+                    
+                    // Only allow budget editing for specific trips
                     String budgetStr = budgetInput.getText().toString().trim();
                     if (!budgetStr.isEmpty()) {
                         totalBudget = Double.parseDouble(budgetStr);
                         
-                        // If a specific trip is selected, save the budget to that trip's budget map
-                        if (selectedTrip != null) {
-                            tripBudgets.put(selectedTrip.getId(), totalBudget);
-                        }
+                        // Save the budget to that trip's budget map
+                        tripBudgets.put(selectedTrip.getId(), totalBudget);
                         
                         // Always save the budget first
                         saveBudgetData();
@@ -1191,13 +1233,8 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                             updateChartData();
                             updateEmptyState();
                             
-                            if (selectedTrip == null) {
-                                // "All Trips" budget updated
-                                showErrorToast("Total budget set to RM" + String.format("%.0f", totalBudget) + " for all trips");
-                            } else {
-                                // Specific trip budget updated without default categories
-                                showErrorToast("Budget set to RM" + String.format("%.0f", totalBudget) + " for " + selectedTrip.getTitle());
-                            }
+                            // Specific trip budget updated without default categories
+                            showErrorToast("Budget set to RM" + String.format("%.0f", totalBudget) + " for " + selectedTrip.getTitle());
                         }
                     }
                 } catch (NumberFormatException e) {
@@ -1538,6 +1575,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                     updateBudgetDisplay();
                     updateChartData();
                     updateEmptyState();
+                    updateEditBudgetIconVisibility();
                     
                 } catch (Exception e) {
                     Log.e(TAG, "Error selecting trip", e);
@@ -1592,6 +1630,8 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             
             // Update FAB visibility - hide when "All Trips" is selected
             updateFabVisibility();
+            // Update edit budget icon visibility
+            updateEditBudgetIconVisibility();
         } catch (Exception e) {
             Log.e(TAG, "Error updating trip selector", e);
         }
@@ -1606,6 +1646,23 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             }
         } catch (Exception e) {
             Log.e(TAG, "Error updating FAB visibility", e);
+        }
+    }
+    
+    private void updateEditBudgetIconVisibility() {
+        try {
+            if (editBudgetIcon != null) {
+                if (selectedTrip == null) {
+                    // "All Trips" selected - hide edit icon (budget is read-only)
+                    editBudgetIcon.setVisibility(View.GONE);
+                } else {
+                    // Specific trip selected - show edit icon (budget is editable)
+                    editBudgetIcon.setVisibility(View.VISIBLE);
+                }
+                Log.d(TAG, "Edit budget icon visibility: " + (selectedTrip == null ? "HIDDEN" : "VISIBLE"));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating edit budget icon visibility", e);
         }
     }
     
@@ -1812,6 +1869,8 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             
             // Update FAB visibility after restoring trip selection
             updateFabVisibility();
+            // Update edit budget icon visibility
+            updateEditBudgetIconVisibility();
             
             Log.d(TAG, "Restored selected trip: " + (selectedTrip != null ? selectedTrip.getTitle() : "All Trips"));
             
