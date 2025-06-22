@@ -25,11 +25,69 @@
                 android:layout_marginBottom="8dp"
                 android:text="@string/nav_budget" />
 
+            <!-- Trip Selector Card -->
+            <androidx.cardview.widget.CardView
+                style="@style/WanderPlan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:layout_marginHorizontal="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        style="@style/WanderPlan.Text.Body"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="🧳 Select Trip"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/layout_trip_selector"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_button_primary"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/tv_selected_trip"
+                            style="@style/WanderPlan.Text.Body"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🌟 All Trips Budget"
+                            android:textColor="@color/white"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/iv_dropdown_arrow"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="8dp"
+                            android:src="@drawable/ic_arrow_back"
+                            android:rotation="270"
+                            app:tint="@color/white" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
             <!-- Budget Overview Cards -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
+                android:layout_marginBottom="16dp"
                 android:paddingHorizontal="16dp"
                 android:orientation="horizontal">
 
@@ -60,7 +118,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="$0.00"
+                            android:text="RM2000.00"
                             android:textColor="@color/primary" />
 
                     </LinearLayout>
@@ -94,7 +152,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="$0.00"
+                            android:text="RM0.00"
                             android:textColor="@color/warning" />
 
                     </LinearLayout>
@@ -130,12 +188,105 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="$0.00"
+                        android:text="RM2000.00"
                         android:textColor="@color/success" />
 
                 </LinearLayout>
 
             </androidx.cardview.widget.CardView>
+
+            <!-- Expense Breakdown Chart -->
+            <androidx.cardview.widget.CardView
+                style="@style/WanderPlan.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:layout_marginHorizontal="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        style="@style/WanderPlan.Text.Title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:text="@string/category_breakdown" />
+
+                    <com.github.mikephil.charting.charts.PieChart
+                        android:id="@+id/pie_chart_expenses"
+                        android:layout_width="match_parent"
+                        android:layout_height="200dp"
+                        android:layout_gravity="center" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Category Filter Chips -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:scrollbars="none">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chip_group_categories"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    app:singleLine="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_all"
+                        style="@style/WanderPlan.Chip.Category"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="All" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_food"
+                        style="@style/WanderPlan.Chip.Category.Food"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/category_food" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_transport"
+                        style="@style/WanderPlan.Chip.Category.Transport"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/category_transport" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_hotel"
+                        style="@style/WanderPlan.Chip.Category.Hotel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/category_hotel" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_activities"
+                        style="@style/WanderPlan.Chip.Category.Activities"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/category_activities" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_shopping"
+                        style="@style/WanderPlan.Chip.Category.Shopping"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/category_shopping" />
+
+                </com.google.android.material.chip.ChipGroup>
+
+            </HorizontalScrollView>
 
             <!-- Recent Expenses Header -->
             <TextView
@@ -151,7 +302,9 @@
                 android:id="@+id/rv_expenses"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
+                android:nestedScrollingEnabled="false"
+                android:paddingBottom="80dp"
+                android:clipToPadding="false" />
 
             <!-- Empty State -->
             <LinearLayout
@@ -160,7 +313,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
                 android:gravity="center"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:visibility="gone">
 
                 <ImageView
                     android:layout_width="80dp"
@@ -176,7 +330,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:text="No expenses recorded yet"
+                    android:text="@string/no_expenses_found"
                     android:textColor="@color/medium_grey" />
 
             </LinearLayout>
@@ -193,7 +347,10 @@
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_margin="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="72dp"
         android:contentDescription="@string/add_expense"
         app:srcCompat="@drawable/ic_add" />
 

@@ -65,6 +65,30 @@
     <string name="category_shopping">Shopping</string>
     <string name="category_other">Other</string>
     
+    <!-- Budget Enhancements -->
+    <string name="expense_added_successfully">Expense added successfully!</string>
+    <string name="select_category">Select Category</string>
+    <string name="select_date">Select Date</string>
+    <string name="budget_overview">Budget Overview</string>
+    <string name="expense_breakdown">Expense Breakdown</string>
+    <string name="daily_spending">Daily Spending</string>
+    <string name="category_breakdown">Category Breakdown</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="this_week">This Week</string>
+    <string name="this_month">This Month</string>
+    <string name="currency_symbol">RM</string>
+    <string name="edit_expense">Edit Expense</string>
+    <string name="delete_expense">Delete Expense</string>
+    <string name="confirm_delete">Are you sure you want to delete this expense?</string>
+    <string name="no_expenses_found">No expenses found</string>
+    <string name="total_expenses">Total Expenses</string>
+    <string name="expense_updated_successfully">Expense updated successfully!</string>
+    <string name="update_expense">Update Expense</string>
+    <string name="expense_details">Expense Details</string>
+    <string name="view_details">View Details</string>
+    <string name="close">Close</string>
+    
     <!-- Settings -->
     <string name="profile">Profile</string>
     <string name="theme">Theme</string>
@@ -80,7 +104,6 @@
     <string name="edit">Edit</string>
     <string name="add">Add</string>
     <string name="confirm">Confirm</string>
-    <string name="select_date">Select Date</string>
     <string name="select_time">Select Time</string>
     <string name="photo">Photo</string>
     <string name="add_photo">Add Photo</string>

@@ -198,6 +198,19 @@ public class TripsFragment extends Fragment {
                     }
                 }
                 
+                // Notify MainActivity to inform other fragments about trip deletion
+                android.util.Log.d("TripsFragment", "=== TRIPS FRAGMENT DELETION SUCCESS ===");
+                android.util.Log.d("TripsFragment", "Trip deleted successfully, tripId: " + tripId);
+                android.util.Log.d("TripsFragment", "Activity type: " + (getActivity() != null ? getActivity().getClass().getSimpleName() : "null"));
+                
+                if (getActivity() instanceof MainActivity) {
+                    android.util.Log.d("TripsFragment", "Calling MainActivity.notifyTripDeleted(" + tripId + ")");
+                    ((MainActivity) getActivity()).notifyTripDeleted(tripId);
+                    android.util.Log.d("TripsFragment", "MainActivity notification sent");
+                } else {
+                    android.util.Log.w("TripsFragment", "Activity is not MainActivity! Cannot notify budget fragments.");
+                }
+                
                 android.util.Log.d("TripsFragment", "Trip deleted successfully: " + trip.getTitle());
             }
             
