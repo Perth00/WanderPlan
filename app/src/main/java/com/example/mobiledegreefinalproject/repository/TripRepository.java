@@ -42,7 +42,7 @@ public class TripRepository {
     // Add a set to track activities being deleted to prevent race conditions
     private final Set<String> activitiesBeingDeleted = new HashSet<>();
     private final Map<String, Long> deletionTimestamps = new HashMap<>();
-    private static final long DELETION_TIMEOUT_MS = 30000; // 30 seconds timeout
+    private static final long DELETION_TIMEOUT_MS = 5000; // FIXED: 5 seconds timeout instead of 30 seconds for faster cleanup
     
     private TripRepository(Context context) {
         try {
@@ -352,6 +352,21 @@ public class TripRepository {
                 Log.d(TAG, "Cleared Firebase-synced trips from local storage");
             } catch (Exception e) {
                 Log.e(TAG, "Error clearing Firebase trips", e);
+            }
+        });
+    }
+    
+    public void clearAllLocalTrips() {
+        executor.execute(() -> {
+            try {
+                List<Trip> allTrips = tripDao.getAllTripsSync();
+                for (Trip trip : allTrips) {
+                    // Delete all trips (this will cascade delete all activities)
+                    tripDao.deleteTrip(trip);
+                }
+                Log.d(TAG, "Cleared all " + allTrips.size() + " local trips from database");
+            } catch (Exception e) {
+                Log.e(TAG, "Error clearing all local trips", e);
             }
         });
     }
@@ -1045,9 +1060,9 @@ public class TripRepository {
                 Log.d(TAG, "=== STARTING ACTIVITY DELETION ===");
                 Log.d(TAG, "Activity: " + activity.getTitle() + " (Local ID: " + activity.getId() + ", Firebase ID: " + activity.getFirebaseId() + ")");
                 
-                // CRITICAL FIX: Add synchronization to prevent concurrent deletions of the same activity
+                // CRITICAL FIX: Simplified synchronization to prevent concurrent deletions but allow rapid sequential deletions
                 synchronized (this) {
-                    // Step 0: Check if this activity is already being deleted
+                    // Step 0: Check if this activity is already being deleted (shorter check)
                     if (activity.getFirebaseId() != null && !activity.getFirebaseId().isEmpty()) {
                         synchronized (activitiesBeingDeleted) {
                             if (activitiesBeingDeleted.contains(activity.getFirebaseId())) {
@@ -1082,7 +1097,7 @@ public class TripRepository {
                         return;
                     }
                     
-                    // Step 2: Mark activity as being deleted to prevent Firebase listener from re-adding it
+                    // Step 2: Mark activity as being deleted briefly (shortened duration)
                     if (existingActivity.getFirebaseId() != null && !existingActivity.getFirebaseId().isEmpty()) {
                         synchronized (activitiesBeingDeleted) {
                             activitiesBeingDeleted.add(existingActivity.getFirebaseId());
@@ -1095,7 +1110,7 @@ public class TripRepository {
                     activityDao.deleteActivity(existingActivity);
                     Log.d(TAG, "✓ Activity deleted from local database successfully");
                     
-                    // Step 4: Handle Firebase deletion for logged-in users with timeout protection
+                    // Step 4: Handle Firebase deletion for logged-in users (SHORTENED TIMEOUT)
                     if (!userManager.isLoggedIn()) {
                         Log.d(TAG, "Guest user - local deletion complete");
                         // Clean up deletion tracking
@@ -1143,7 +1158,7 @@ public class TripRepository {
                     
                     Log.d(TAG, "Starting Firebase deletion for trip: " + trip.getTitle());
                     
-                    // Step 7: Delete from Firebase with timeout protection
+                    // Step 7: Delete from Firebase with MUCH SHORTER timeout (2 seconds instead of 15)
                     final TripActivity finalActivity = existingActivity; // Make it effectively final for inner classes
                     deleteActivityFromFirebaseWithTimeout(existingActivity, trip, new OnActivityOperationListener() {
                         @Override
@@ -1176,7 +1191,7 @@ public class TripRepository {
                                 listener.onSuccess(finalActivity.getId());
                             }
                         }
-                    }, 15000); // 15 second timeout for deletion
+                    }, 2000); // FIXED: 2 second timeout instead of 15 seconds for rapid deletions
                 }
                 
             } catch (Exception e) {
