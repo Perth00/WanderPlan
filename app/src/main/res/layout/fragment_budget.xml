@@ -99,29 +99,50 @@
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1">
 
-                    <LinearLayout
+                    <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical"
                         android:padding="16dp">
 
-                        <TextView
-                            style="@style/WanderPlan.Text.Caption"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/total_budget" />
+                        <!-- Budget Content -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/tv_total_budget"
-                            style="@style/WanderPlan.Text.Title"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="RM2000.00"
-                            android:textColor="@color/primary" />
+                            <TextView
+                                style="@style/WanderPlan.Text.Caption"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/total_budget" />
 
-                    </LinearLayout>
+                            <TextView
+                                android:id="@+id/tv_total_budget"
+                                style="@style/WanderPlan.Text.Title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="RM2000.00"
+                                android:textColor="@color/primary" />
+
+                        </LinearLayout>
+
+                        <!-- Edit Icon (only visible when specific trip is selected) -->
+                        <ImageView
+                            android:id="@+id/iv_edit_budget"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_alignParentTop="true"
+                            android:src="@drawable/ic_edit"
+                            android:contentDescription="Edit budget"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:padding="2dp"
+                            app:tint="@color/medium_grey"
+                            android:visibility="visible" />
+
+                    </RelativeLayout>
 
                 </androidx.cardview.widget.CardView>
 
