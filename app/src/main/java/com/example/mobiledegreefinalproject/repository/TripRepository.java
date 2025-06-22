@@ -470,6 +470,10 @@ public class TripRepository {
         return tripDao.getTripById(tripId);
     }
     
+    public Trip getTripByIdSync(int tripId) {
+        return tripDao.getTripByIdSync(tripId);
+    }
+    
     public void insertTrip(Trip trip, OnTripOperationListener listener) {
         executor.execute(() -> {
             try {
@@ -618,24 +622,27 @@ public class TripRepository {
                     doc.getReference().delete();
                 }
                 
-                // Finally delete the trip document
-                firestore.collection("users")
-                    .document(userEmail)
-                    .collection("trips")
-                    .document(tripFirebaseId)
-                    .delete()
-                    .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "Trip and activities deleted from Firebase successfully");
-                        if (listener != null) {
-                            listener.onSuccess(trip.getId());
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Error deleting trip from Firebase", e);
-                        if (listener != null) {
-                            listener.onError("Failed to delete trip from Firebase: " + e.getMessage());
-                        }
-                    });
+                // Delete associated budget records before deleting the trip
+                deleteTripBudgetRecords(trip.getId(), userEmail, () -> {
+                    // Finally delete the trip document
+                    firestore.collection("users")
+                        .document(userEmail)
+                        .collection("trips")
+                        .document(tripFirebaseId)
+                        .delete()
+                        .addOnSuccessListener(aVoid -> {
+                            Log.d(TAG, "Trip, activities, and budget records deleted from Firebase successfully");
+                            if (listener != null) {
+                                listener.onSuccess(trip.getId());
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Error deleting trip from Firebase", e);
+                            if (listener != null) {
+                                listener.onError("Failed to delete trip from Firebase: " + e.getMessage());
+                            }
+                        });
+                });
             })
             .addOnFailureListener(e -> {
                 Log.e(TAG, "Error fetching activities for trip deletion", e);
@@ -654,6 +661,68 @@ public class TripRepository {
         } catch (Exception e) {
             Log.w(TAG, "Error deleting image from Firebase Storage", e);
         }
+    }
+    
+    private void deleteTripBudgetRecords(int tripId, String userEmail, Runnable onComplete) {
+        Log.d(TAG, "Deleting budget records for trip ID: " + tripId);
+        
+        firestore.collection("users")
+            .document(userEmail)
+            .collection("budgets")
+            .whereEqualTo("tripId", tripId)
+            .get()
+            .addOnSuccessListener(querySnapshot -> {
+                if (querySnapshot.isEmpty()) {
+                    Log.d(TAG, "No budget records found for trip " + tripId);
+                    onComplete.run();
+                    return;
+                }
+                
+                Log.d(TAG, "Found " + querySnapshot.size() + " budget records to delete for trip " + tripId);
+                
+                // Delete each budget document
+                int totalDocs = querySnapshot.size();
+                final int[] deletedCount = {0};
+                final boolean[] hasError = {false};
+                
+                for (com.google.firebase.firestore.DocumentSnapshot document : querySnapshot) {
+                    document.getReference().delete()
+                        .addOnSuccessListener(aVoid -> {
+                            synchronized (deletedCount) {
+                                deletedCount[0]++;
+                                Log.d(TAG, "Deleted budget record: " + document.getId());
+                                
+                                if (deletedCount[0] >= totalDocs) {
+                                    // All deletions completed
+                                    if (hasError[0]) {
+                                        Log.w(TAG, "Some budget records could not be deleted, but continuing");
+                                    } else {
+                                        Log.d(TAG, "All budget records deleted successfully for trip " + tripId);
+                                    }
+                                    onComplete.run();
+                                }
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            synchronized (deletedCount) {
+                                deletedCount[0]++;
+                                hasError[0] = true;
+                                Log.e(TAG, "Error deleting budget record: " + document.getId(), e);
+                                
+                                if (deletedCount[0] >= totalDocs) {
+                                    // All deletions completed
+                                    Log.w(TAG, "Budget record deletion completed with errors for trip " + tripId);
+                                    onComplete.run();
+                                }
+                            }
+                        });
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Error fetching budget records for deletion", e);
+                // Continue anyway - don't let budget deletion failure block trip deletion
+                onComplete.run();
+            });
     }
     
     public LiveData<List<TripActivity>> getActivitiesForTrip(int tripId) {

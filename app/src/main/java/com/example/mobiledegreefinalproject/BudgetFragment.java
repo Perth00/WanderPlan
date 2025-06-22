@@ -34,6 +34,7 @@ import com.example.mobiledegreefinalproject.database.WanderPlanDatabase;
 import com.example.mobiledegreefinalproject.database.TripDao;
 import com.example.mobiledegreefinalproject.model.Expense;
 import com.example.mobiledegreefinalproject.repository.TripRepository;
+import com.example.mobiledegreefinalproject.repository.BudgetRepository;
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
@@ -89,8 +90,10 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
     private Map<Integer, Double> tripBudgets; // Trip ID -> Budget
     private Map<Integer, List<Expense>> tripExpenses; // Trip ID -> Expenses
     
-    // Database
+    // Database and Firebase
     private TripRepository tripRepository;
+    private BudgetRepository budgetRepository;
+    private UserManager userManager;
     
     // Persistence
     private SharedPreferences sharedPreferences;
@@ -137,6 +140,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             refreshTrips();
         }
         
+        // Refresh budget data from Firebase for logged-in users
+        if (userManager != null && userManager.isLoggedIn() && budgetRepository != null) {
+            refreshBudgetDataFromFirebase();
+        }
+        
         // Ensure the default filter is properly initialized when navigating to this fragment
         // This fixes the issue where expenses don't show when clicking the navigation button
         if (chipGroupCategories != null && expenseAdapter != null) {
@@ -180,9 +188,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             sharedPreferences = context.getSharedPreferences("BudgetFragment", Context.MODE_PRIVATE);
             gson = new Gson();
             tripRepository = TripRepository.getInstance(context);
+            budgetRepository = BudgetRepository.getInstance(context);
+            userManager = UserManager.getInstance(context);
             
-            // Load saved data
-            loadSavedBudgetData();
+            // Load saved data (Firebase or local depending on login status)
+            loadBudgetData();
         }
         
         // Create default "All Trips" option
@@ -712,8 +722,13 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                     return;
                 }
                 
-                            // Create new expense
-                            Expense newExpense = new Expense(title, amount, category);
+                            // Create new expense with tripId for Firebase sync
+                            Expense newExpense;
+                            if (selectedTrip != null) {
+                                newExpense = new Expense(title, amount, category, null, selectedTrip.getId());
+                            } else {
+                                newExpense = new Expense(title, amount, category);
+                            }
                             newExpense.setTimestamp(selectedDate.getTimeInMillis());
                             
                             // Add to the specific trip's expense list (selectedTrip is guaranteed to be not null here)
@@ -727,6 +742,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                                 
                                 // Update the current expenses list to match the selected trip
                                 expenses = tripExpenseList;
+                                
+                                // For logged-in users, sync to Firebase
+                                if (userManager != null && userManager.isLoggedIn()) {
+                                    syncExpenseToFirebase(newExpense);
+                                }
                             }
                             
                             // Save data to persistence
@@ -1018,6 +1038,12 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                         // Save the data
                         saveBudgetData();
                         
+                        // For logged-in users, sync updated expense to Firebase
+                        if (userManager != null && userManager.isLoggedIn() && selectedTrip != null) {
+                            expense.setTripId(selectedTrip.getId()); // Ensure tripId is set
+                            syncExpenseToFirebase(expense);
+                        }
+                        
                         // Update UI
                         updateBudgetDisplay();
                         updateChartData();
@@ -1273,6 +1299,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                         
                         // Always save the budget first
                         saveBudgetData();
+                        
+                        // For logged-in users, sync budget to Firebase
+                        if (userManager != null && userManager.isLoggedIn()) {
+                            syncBudgetToFirebase(selectedTrip.getId(), totalBudget);
+                        }
                         
                         // Add default categories if checkbox exists and is checked - with warning
                         if (finalAddDefaultsCheckbox != null && finalAddDefaultsCheckbox.isChecked()) {
@@ -1805,7 +1836,43 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
         loadUserTrips(); // This will automatically call cleanupDeletedTripsData()
     }
     
-    private void loadSavedBudgetData() {
+    private void loadBudgetData() {
+        if (userManager != null && userManager.isLoggedIn()) {
+            // For logged-in users, load from Firebase (when implemented)
+            // For now, load from local storage and let sync handle it
+            loadLocalBudgetData();
+            Log.d(TAG, "Loaded budget data for logged-in user from local storage");
+        } else {
+            // For guest users, load from local storage only
+            loadLocalBudgetData();
+            Log.d(TAG, "Loaded budget data for guest user from local storage");
+        }
+    }
+    
+    private void loadLocalBudgetData() {
+        try {
+            if (budgetRepository == null) {
+                Log.w(TAG, "BudgetRepository is null, using legacy method");
+                loadSavedBudgetDataLegacy();
+                return;
+            }
+            
+            BudgetRepository.BudgetData data = budgetRepository.loadBudgetDataLocally();
+            
+            tripBudgets.putAll(data.tripBudgets);
+            tripExpenses.putAll(data.tripExpenses);
+            totalBudget = data.totalBudget;
+            
+            Log.d(TAG, "Loaded budget data using BudgetRepository: " + tripBudgets.size() + " trip budgets, " + 
+                  tripExpenses.size() + " trip expenses");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading budget data", e);
+            loadSavedBudgetDataLegacy(); // Fallback to legacy method
+        }
+    }
+    
+    private void loadSavedBudgetDataLegacy() {
         try {
             if (sharedPreferences == null || gson == null) return;
             
@@ -1836,15 +1903,34 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             totalBudget = Double.longBitsToDouble(sharedPreferences.getLong("total_budget", 
                 Double.doubleToLongBits(2000.0)));
             
-            Log.d(TAG, "Loaded budget data: " + tripBudgets.size() + " trip budgets, " + 
+            Log.d(TAG, "Loaded budget data (legacy): " + tripBudgets.size() + " trip budgets, " + 
                   tripExpenses.size() + " trip expenses");
             
         } catch (Exception e) {
-            Log.e(TAG, "Error loading saved budget data", e);
+            Log.e(TAG, "Error loading saved budget data (legacy)", e);
         }
     }
     
     private void saveBudgetData() {
+        try {
+            if (budgetRepository == null) {
+                Log.w(TAG, "BudgetRepository is null, using legacy save method");
+                saveBudgetDataLegacy();
+                return;
+            }
+            
+            int selectedTripId = selectedTrip != null ? selectedTrip.getId() : -1;
+            budgetRepository.saveBudgetDataLocally(tripBudgets, tripExpenses, selectedTripId, totalBudget);
+            
+            Log.d(TAG, "Saved budget data using BudgetRepository");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error saving budget data", e);
+            saveBudgetDataLegacy(); // Fallback to legacy method
+        }
+    }
+    
+    private void saveBudgetDataLegacy() {
         try {
             if (sharedPreferences == null || gson == null) return;
             
@@ -1870,10 +1956,10 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             
             editor.apply();
             
-            Log.d(TAG, "Saved budget data successfully");
+            Log.d(TAG, "Saved budget data successfully (legacy)");
             
         } catch (Exception e) {
-            Log.e(TAG, "Error saving budget data", e);
+            Log.e(TAG, "Error saving budget data (legacy)", e);
         }
     }
     
@@ -1936,6 +2022,115 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
         } catch (Exception e) {
             Log.e(TAG, "Error restoring selected trip", e);
         }
+    }
+
+    private void syncExpenseToFirebase(Expense expense) {
+        if (budgetRepository == null || userManager == null || !userManager.isLoggedIn()) {
+            return;
+        }
+        
+        String userEmail = userManager.getUserEmail();
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            Log.w(TAG, "User email not available for Firebase sync");
+            return;
+        }
+        
+        Log.d(TAG, "Syncing expense to Firebase: " + expense.getTitle());
+        
+        // Use BudgetRepository to sync the expense
+        budgetRepository.syncExpenseToFirebase(expense, userEmail, new BudgetRepository.OnBudgetOperationListener() {
+            @Override
+            public void onSuccess() {
+                Log.d(TAG, "Expense synced to Firebase successfully: " + expense.getTitle());
+                expense.setSynced(true);
+                saveBudgetData(); // Save the updated sync status locally
+            }
+            
+            @Override
+            public void onError(String error) {
+                Log.w(TAG, "Failed to sync expense to Firebase: " + error);
+                // Don't show error to user - expense is saved locally
+            }
+        });
+    }
+    
+    private void syncBudgetToFirebase(int tripId, double budget) {
+        if (budgetRepository == null || userManager == null || !userManager.isLoggedIn()) {
+            return;
+        }
+        
+        String userEmail = userManager.getUserEmail();
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            Log.w(TAG, "User email not available for Firebase sync");
+            return;
+        }
+        
+        Log.d(TAG, "Syncing budget to Firebase for trip " + tripId + ": RM" + budget);
+        
+        // Use BudgetRepository to sync the budget
+        budgetRepository.syncTripBudgetToFirebase(tripId, budget, userEmail, new BudgetRepository.OnBudgetOperationListener() {
+            @Override
+            public void onSuccess() {
+                Log.d(TAG, "Budget synced to Firebase successfully for trip " + tripId);
+            }
+            
+            @Override
+            public void onError(String error) {
+                Log.w(TAG, "Failed to sync budget to Firebase: " + error);
+                // Don't show error to user - budget is saved locally
+            }
+        });
+    }
+    
+    private void refreshBudgetDataFromFirebase() {
+        if (budgetRepository == null) {
+            return;
+        }
+        
+        Log.d(TAG, "Refreshing budget data from Firebase");
+        
+        budgetRepository.fetchBudgetDataFromFirebase(new BudgetRepository.OnBudgetFetchListener() {
+            @Override
+            public void onSuccess() {
+                Log.d(TAG, "Successfully refreshed budget data from Firebase");
+                
+                // Reload the budget data and update UI
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        try {
+                            // Reload budget data
+                            loadBudgetData();
+                            
+                            // Restore selected trip
+                            restoreSelectedTrip();
+                            
+                            // Update UI
+                            updateBudgetDisplay();
+                            updateChartData();
+                            updateEmptyState();
+                            
+                            // Update adapter
+                            if (expenseAdapter != null) {
+                                expenseAdapter.updateExpenses(expenses);
+                                expenseAdapter.clearFilter();
+                                initializeDefaultFilter();
+                            }
+                            
+                            Log.d(TAG, "UI updated after Firebase budget data refresh");
+                            
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error updating UI after budget data refresh", e);
+                        }
+                    });
+                }
+            }
+            
+            @Override
+            public void onError(String error) {
+                Log.w(TAG, "Failed to refresh budget data from Firebase: " + error);
+                // Continue with local data - don't disrupt user experience
+            }
+        });
     }
 
     @Override
