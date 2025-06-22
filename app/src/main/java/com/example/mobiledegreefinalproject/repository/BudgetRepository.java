@@ -568,6 +568,76 @@ public class BudgetRepository {
         });
     }
     
+    // CRITICAL FIX: Add method to delete individual expenses from Firebase
+    public void deleteExpenseFromFirebase(Expense expense, int tripId, OnBudgetOperationListener listener) {
+        if (!userManager.isLoggedIn()) {
+            if (listener != null) {
+                listener.onSuccess(); // No Firebase to clean up for guest users
+            }
+            return;
+        }
+        
+        if (expense.getFirebaseId() == null || expense.getFirebaseId().trim().isEmpty()) {
+            Log.d(TAG, "Expense has no Firebase ID, nothing to delete from Firebase");
+            if (listener != null) {
+                listener.onSuccess(); // Nothing to delete
+            }
+            return;
+        }
+        
+        String userEmail = userManager.getUserEmail();
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            if (listener != null) {
+                listener.onError("User email not available");
+            }
+            return;
+        }
+        
+        Log.d(TAG, "Deleting expense from Firebase: " + expense.getTitle() + " (ID: " + expense.getFirebaseId() + ")");
+        
+        executor.execute(() -> {
+            try {
+                TripRepository tripRepo = TripRepository.getInstance(context);
+                com.example.mobiledegreefinalproject.database.Trip trip = tripRepo.getTripByIdSync(tripId);
+                
+                if (trip == null || trip.getFirebaseId() == null || trip.getFirebaseId().isEmpty()) {
+                    Log.w(TAG, "Cannot delete expense - trip not found or not synced to Firebase");
+                    if (listener != null) {
+                        listener.onSuccess(); // No Firebase to clean up
+                    }
+                    return;
+                }
+                
+                // Delete the expense document from Firebase
+                firestore.collection("users")
+                    .document(userEmail)
+                    .collection("trips")
+                    .document(trip.getFirebaseId())
+                    .collection("budget")
+                    .document(expense.getFirebaseId())
+                    .delete()
+                    .addOnSuccessListener(aVoid -> {
+                        Log.d(TAG, "Expense deleted from Firebase successfully: " + expense.getTitle());
+                        if (listener != null) {
+                            listener.onSuccess();
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Error deleting expense from Firebase: " + expense.getTitle(), e);
+                        if (listener != null) {
+                            listener.onError("Failed to delete expense from Firebase: " + e.getMessage());
+                        }
+                    });
+                    
+            } catch (Exception e) {
+                Log.e(TAG, "Exception deleting expense from Firebase", e);
+                if (listener != null) {
+                    listener.onError("Failed to delete expense: " + e.getMessage());
+                }
+            }
+        });
+    }
+    
     // Fetch budget data from Firebase for all user trips
     public void fetchBudgetDataFromFirebase(OnBudgetFetchListener listener) {
         if (!userManager.isLoggedIn()) {

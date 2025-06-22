@@ -30,6 +30,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.example.mobiledegreefinalproject.repository.TripRepository;
+
 public class TripDetailActivity extends AppCompatActivity {
 
     private static final String TAG = "TripDetailActivity";
@@ -116,23 +118,32 @@ public class TripDetailActivity extends AppCompatActivity {
                     if (result.getResultCode() == RESULT_OK) {
                         Log.d(TAG, "Activity creation successful - refreshing data directly");
                         
-                        // CRITICAL FIX: Use direct data refresh without LiveData observers to prevent crashes
-                        refreshActivityDataDirectly();
+                        // CRITICAL FIX: Add delay before refresh to allow Firebase sync to complete
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            if (!isFinishing() && !isDestroyed()) {
+                                refreshActivityDataDirectly();
+                                
+                                // Show success message via info panel instead of toast
+                                if (infoPanelManager != null) {
+                                    infoPanelManager.addCustomMessage("Activity added successfully! Timeline updated.", false);
+                                }
+                            }
+                        }, 1000); // 1 second delay
                         
-                        // Show success message via info panel instead of toast
-                        if (infoPanelManager != null) {
-                            infoPanelManager.addCustomMessage("Activity added successfully! Refreshing timeline...", false);
-                        }
+                        // Also do immediate refresh for local data
+                        refreshActivityDataDirectly();
                         
                     } else {
                         Log.d(TAG, "Activity creation cancelled or failed");
-                        // Just reload the current data
+                        // Just reload the current data to ensure consistency
                         refreshActivityDataDirectly();
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error handling activity result", e);
                     // Fallback to basic refresh
-                    refreshActivityDataDirectly();
+                    if (!isFinishing() && !isDestroyed()) {
+                        refreshActivityDataDirectly();
+                    }
                 }
             });
     }
@@ -781,82 +792,67 @@ public class TripDetailActivity extends AppCompatActivity {
     
     // CRITICAL FIX: Method to refresh activity data without using LiveData observers (prevents crashes)
     private void refreshActivityDataDirectly() {
+        Log.d(TAG, "=== DIRECT ACTIVITY DATA REFRESH ===");
+        
         if (isFinishing() || isDestroyed()) {
-            Log.w(TAG, "Activity destroyed, skipping data refresh");
+            Log.w(TAG, "Activity finishing/destroyed, skipping refresh");
             return;
         }
         
-        Log.d(TAG, "Refreshing activity data directly from repository");
-        
-        // Use background thread to avoid blocking UI
-        new Thread(() -> {
-            try {
-                com.example.mobiledegreefinalproject.repository.TripRepository repository = 
-                    com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
-                
-                // Get fresh data from database directly
-                List<TripActivity> activities = repository.getActivitiesForTripSync(tripId);
-                
-                runOnUiThread(() -> {
-                    if (!isFinishing() && !isDestroyed()) {
-                        Log.d(TAG, "Updating UI with " + activities.size() + " activities");
+        try {
+            new Thread(() -> {
+                try {
+                    TripRepository repository = TripRepository.getInstance(this);
+                    
+                    // CRITICAL FIX: Get activities directly and clean up any duplicates
+                    List<TripActivity> activities = repository.getActivitiesForTripSync(tripId);
+                    
+                    // Remove duplicates based on title and time (within 2 minutes)
+                    Map<String, TripActivity> uniqueActivities = new LinkedHashMap<>();
+                    for (TripActivity activity : activities) {
+                        String key = activity.getTitle() + "_" + (activity.getDateTime() / 120000); // Group by 2-minute windows
                         
-                        try {
-                            displayTimeline(activities);
-                            
-                            // Also update trip info to ensure consistency
-                            if (currentTrip != null) {
-                                displayTripInfo(currentTrip);
+                        if (!uniqueActivities.containsKey(key)) {
+                            uniqueActivities.put(key, activity);
+                        } else {
+                            // Keep the one with Firebase ID if available, or the newer one
+                            TripActivity existing = uniqueActivities.get(key);
+                            if (activity.getFirebaseId() != null && existing.getFirebaseId() == null) {
+                                uniqueActivities.put(key, activity);
+                            } else if (activity.getUpdatedAt() > existing.getUpdatedAt()) {
+                                uniqueActivities.put(key, activity);
                             }
-                            
-                            Log.d(TAG, "Activity data refresh completed successfully");
-                            
-                        } catch (Exception uiError) {
-                            Log.e(TAG, "Error updating UI with refreshed data", uiError);
-                            
-                            // Fallback: try again after a short delay
-                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                                if (!isFinishing() && !isDestroyed()) {
-                                    try {
-                                        displayTimeline(activities);
-                                    } catch (Exception fallbackError) {
-                                        Log.e(TAG, "Fallback UI update also failed", fallbackError);
-                                    }
-                                }
-                            }, 1000);
                         }
-                    } else {
-                        Log.w(TAG, "Activity destroyed during UI update - skipping");
                     }
-                });
-                
-            } catch (Exception e) {
-                Log.e(TAG, "Error refreshing activity data directly", e);
-                runOnUiThread(() -> {
-                    if (!isFinishing() && !isDestroyed()) {
-                        // Show error to user but don't crash
-                        try {
-                            if (infoPanelManager != null) {
-                                infoPanelManager.addCustomMessage("Error refreshing data", true);
-                            }
-                        } catch (Exception toastError) {
-                            Log.w(TAG, "Error showing refresh error toast", toastError);
+                    
+                    List<TripActivity> cleanedActivities = new ArrayList<>(uniqueActivities.values());
+                    
+                    // Sort activities by date/time
+                    cleanedActivities.sort((a1, a2) -> Long.compare(a1.getDateTime(), a2.getDateTime()));
+                    
+                    runOnUiThread(() -> {
+                        if (!isFinishing() && !isDestroyed()) {
+                            Log.d(TAG, "Updating UI with " + cleanedActivities.size() + " activities");
+                            displayTimeline(cleanedActivities);
                         }
-                        
-                        // Try fallback refresh after short delay
-                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                            if (!isFinishing() && !isDestroyed()) {
-                                try {
-                                    loadTripData();
-                                } catch (Exception fallbackError) {
-                                    Log.e(TAG, "Fallback loadTripData also failed", fallbackError);
-                                }
-                            }
-                        }, 2000);
-                    }
-                });
+                    });
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in direct activity refresh thread", e);
+                    runOnUiThread(() -> {
+                        if (!isFinishing() && !isDestroyed() && infoPanelManager != null) {
+                            infoPanelManager.addCustomMessage("Failed to refresh activities", true);
+                        }
+                    });
+                }
+            }).start();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting direct activity refresh", e);
+            if (infoPanelManager != null) {
+                infoPanelManager.addCustomMessage("Failed to refresh activities", true);
             }
-        }).start();
+        }
     }
 
     @Override
