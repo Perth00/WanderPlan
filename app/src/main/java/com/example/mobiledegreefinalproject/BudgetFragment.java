@@ -443,15 +443,9 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                 expensesToChart = getFilteredExpensesFromAdapter();
             }
             
-            // Calculate totals for each category from filtered expenses
-            if (expensesToChart != null && !expensesToChart.isEmpty()) {
-                for (Expense expense : expensesToChart) {
-                    Expense.Category category = expense.getCategory();
-                    categoryTotals.put(category, categoryTotals.getOrDefault(category, 0.0) + expense.getAmount());
-                }
-            }
+            // Check if a specific category filter is active
+            Expense.Category activeFilter = getCurrentActiveFilter();
             
-            // Create pie entries - only for categories with actual expenses (> 0)
             List<PieEntry> entries = new ArrayList<>();
             Context context = getContext();
             if (context == null) return;
@@ -465,11 +459,41 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                 ContextCompat.getColor(context, R.color.medium_grey)
             };
             
-            // Add only categories with expenses > 0
-            for (Map.Entry<Expense.Category, Double> entry : categoryTotals.entrySet()) {
-                double value = entry.getValue();
-                if (value > 0) {  // Only show categories with actual expenses
-                    entries.add(new PieEntry((float)value, entry.getKey().getDisplayName()));
+            if (activeFilter != null) {
+                // Specific category filter active - show individual expenses within that category
+                if (expensesToChart != null && !expensesToChart.isEmpty()) {
+                    int colorIndex = 0;
+                    for (Expense expense : expensesToChart) {
+                        if (expense.getCategory() == activeFilter && expense.getAmount() > 0) {
+                            entries.add(new PieEntry((float)expense.getAmount(), expense.getTitle()));
+                            colorIndex++;
+                        }
+                    }
+                    
+                    // Calculate category total for center text
+                    double categoryTotal = 0.0;
+                    for (Expense expense : expensesToChart) {
+                        if (expense.getCategory() == activeFilter) {
+                            categoryTotal += expense.getAmount();
+                        }
+                    }
+                    categoryTotals.put(activeFilter, categoryTotal);
+                }
+            } else {
+                // No specific filter or "All" selected - show category breakdown (original logic)
+                if (expensesToChart != null && !expensesToChart.isEmpty()) {
+                    for (Expense expense : expensesToChart) {
+                        Expense.Category category = expense.getCategory();
+                        categoryTotals.put(category, categoryTotals.getOrDefault(category, 0.0) + expense.getAmount());
+                    }
+                }
+                
+                // Add only categories with expenses > 0
+                for (Map.Entry<Expense.Category, Double> entry : categoryTotals.entrySet()) {
+                    double value = entry.getValue();
+                    if (value > 0) {  // Only show categories with actual expenses
+                        entries.add(new PieEntry((float)value, entry.getKey().getDisplayName()));
+                    }
                 }
             }
             
@@ -479,7 +503,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                 return;
             }
             
-            PieDataSet dataSet = new PieDataSet(entries, "Expense Categories");
+            PieDataSet dataSet = new PieDataSet(entries, activeFilter != null ? "Individual Expenses" : "Expense Categories");
             dataSet.setColors(colors);
             dataSet.setValueTextColor(Color.WHITE);
             dataSet.setValueTextSize(11f);
@@ -492,10 +516,15 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             
             PieData data = new PieData(dataSet);
             pieChart.setData(data);
+            
+            // Update center text based on active filter
+            updateChartCenterText(categoryTotals);
+            
             pieChart.animateY(1000);
             pieChart.invalidate();
             
-            Log.d(TAG, "Chart updated with " + entries.size() + " categories from " + expensesToChart.size() + " filtered expenses");
+            String chartType = activeFilter != null ? "individual expenses for " + activeFilter.getDisplayName() : "categories";
+            Log.d(TAG, "Chart updated with " + entries.size() + " " + chartType + " from " + expensesToChart.size() + " filtered expenses");
         } catch (Exception e) {
             Log.e(TAG, "Error updating chart data", e);
         }
@@ -544,6 +573,36 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             }
         }
         return null; // No filter or "All" is selected
+    }
+    
+    /**
+     * Update the chart's center text to show category total when a filter is active
+     */
+    private void updateChartCenterText(Map<Expense.Category, Double> categoryTotals) {
+        try {
+            if (pieChart == null) return;
+            
+            Expense.Category activeFilter = getCurrentActiveFilter();
+            
+            if (activeFilter == null) {
+                // No filter active - show default breakdown text
+                pieChart.setCenterText("💰\nExpense\nBreakdown");
+            } else {
+                // Specific category filter active - show that category's total
+                double categoryTotal = categoryTotals.getOrDefault(activeFilter, 0.0);
+                String categoryEmoji = activeFilter.getEmoji();
+                String categoryName = activeFilter.getDisplayName();
+                String formattedAmount = String.format(Locale.getDefault(), "RM%.2f", categoryTotal);
+                
+                // Create multi-line center text showing category and total
+                String centerText = String.format("%s\n%s\n%s", categoryEmoji, categoryName, formattedAmount);
+                pieChart.setCenterText(centerText);
+                
+                Log.d(TAG, "Chart center text updated for " + categoryName + ": " + formattedAmount);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating chart center text", e);
+        }
     }
 
     private void updateEmptyState() {
