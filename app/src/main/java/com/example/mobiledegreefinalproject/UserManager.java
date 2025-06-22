@@ -534,6 +534,12 @@ public class UserManager {
         void onSyncRequired(int localTripCount, int firebaseTripCount);
     }
 
+    public interface OnBudgetSyncListener {
+        void onSuccess();
+        void onError(String error);
+        void onSyncRequired(int localBudgetCount, int firebaseBudgetCount);
+    }
+
     // Trip sync methods
     public void checkTripSyncStatus(OnTripSyncListener listener) {
         if (!isLoggedIn()) {
@@ -704,5 +710,154 @@ public class UserManager {
                 });
             }
         }).start();
+    }
+
+    // Budget sync methods
+    public void checkBudgetSyncStatus(OnBudgetSyncListener listener) {
+        if (!isLoggedIn()) {
+            listener.onError("User not logged in");
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                com.example.mobiledegreefinalproject.repository.BudgetRepository budgetRepo = 
+                    com.example.mobiledegreefinalproject.repository.BudgetRepository.getInstance(context);
+                
+                budgetRepo.checkBudgetSyncStatus(new com.example.mobiledegreefinalproject.repository.BudgetRepository.OnBudgetSyncListener() {
+                    @Override
+                    public void onSuccess() {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            listener.onSuccess();
+                        });
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            listener.onError(error);
+                        });
+                    }
+                    
+                    @Override
+                    public void onSyncRequired(int localBudgetCount, int firebaseBudgetCount) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            listener.onSyncRequired(localBudgetCount, firebaseBudgetCount);
+                        });
+                    }
+                });
+                    
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking budget sync status", e);
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onError("Failed to check budget sync status: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    public void syncLocalBudgetDataToFirebase(OnBudgetSyncListener listener) {
+        if (!isLoggedIn()) {
+            listener.onError("User not logged in");
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "Starting sync of local budget data to Firebase");
+                
+                com.example.mobiledegreefinalproject.repository.BudgetRepository budgetRepo = 
+                    com.example.mobiledegreefinalproject.repository.BudgetRepository.getInstance(context);
+                
+                budgetRepo.syncLocalBudgetDataToFirebase(new com.example.mobiledegreefinalproject.repository.BudgetRepository.OnBudgetSyncListener() {
+                    @Override
+                    public void onSuccess() {
+                        Log.d(TAG, "Budget data synced successfully");
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            listener.onSuccess();
+                        });
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "Budget sync error: " + error);
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            listener.onError(error);
+                        });
+                    }
+                    
+                    @Override
+                    public void onSyncRequired(int localBudgetCount, int firebaseBudgetCount) {
+                        // This shouldn't happen in this context
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            listener.onError("Unexpected sync required callback");
+                        });
+                    }
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error during local budget data sync", e);
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onError("Failed to sync local budget data: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    public void discardLocalBudgetData(OnBudgetSyncListener listener) {
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "Discarding local unsynced budget data");
+                
+                com.example.mobiledegreefinalproject.repository.BudgetRepository budgetRepo = 
+                    com.example.mobiledegreefinalproject.repository.BudgetRepository.getInstance(context);
+                
+                budgetRepo.clearLocalBudgetData();
+                
+                Log.d(TAG, "Successfully discarded local budget data");
+                
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onSuccess();
+                });
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error discarding local budget data", e);
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    listener.onError("Failed to discard local budget data: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    public void deleteTripBudgetRecords(int tripId, OnBudgetSyncListener listener) {
+        if (!isLoggedIn()) {
+            if (listener != null) {
+                listener.onSuccess(); // No Firebase to clean up
+            }
+            return;
+        }
+        
+        Log.d(TAG, "Deleting budget records for trip ID: " + tripId);
+        
+        com.example.mobiledegreefinalproject.repository.BudgetRepository budgetRepo = 
+            com.example.mobiledegreefinalproject.repository.BudgetRepository.getInstance(context);
+        
+        budgetRepo.deleteTripBudgetRecordsFromFirebase(tripId, new com.example.mobiledegreefinalproject.repository.BudgetRepository.OnBudgetOperationListener() {
+            @Override
+            public void onSuccess() {
+                Log.d(TAG, "Budget records deleted successfully for trip " + tripId);
+                if (listener != null) {
+                    listener.onSuccess();
+                }
+            }
+            
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Error deleting budget records for trip " + tripId + ": " + error);
+                if (listener != null) {
+                    listener.onError(error);
+                }
+            }
+        });
     }
 }

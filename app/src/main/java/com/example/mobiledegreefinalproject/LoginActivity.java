@@ -253,26 +253,50 @@ public class LoginActivity extends AppCompatActivity {
     private void checkTripSyncStatus() {
         // First fetch Firebase trips, then check for sync conflicts
         fetchFirebaseTrips(() -> {
+            // Check trip sync status first
             userManager.checkTripSyncStatus(new UserManager.OnTripSyncListener() {
                 @Override
                 public void onSuccess() {
-                    // No sync needed, proceed to main activity
-                    navigateToMainActivity();
+                    // No trip sync needed, check budget sync
+                    checkBudgetSyncStatus();
                 }
                 
                 @Override
                 public void onError(String error) {
-                    // Error checking sync, but proceed anyway
+                    // Error checking trip sync, but still check budget sync
                     android.util.Log.e("LoginActivity", "Trip sync check error: " + error);
-                    navigateToMainActivity();
+                    checkBudgetSyncStatus();
                 }
                 
                 @Override
                 public void onSyncRequired(int localTripCount, int firebaseTripCount) {
-                    // Show sync dialog
+                    // Show trip sync dialog first
                     showTripSyncDialog(localTripCount, firebaseTripCount);
                 }
             });
+        });
+    }
+    
+    private void checkBudgetSyncStatus() {
+        userManager.checkBudgetSyncStatus(new UserManager.OnBudgetSyncListener() {
+            @Override
+            public void onSuccess() {
+                // No budget sync needed, proceed to main activity
+                navigateToMainActivity();
+            }
+            
+            @Override
+            public void onError(String error) {
+                // Error checking budget sync, but proceed anyway
+                android.util.Log.e("LoginActivity", "Budget sync check error: " + error);
+                navigateToMainActivity();
+            }
+            
+            @Override
+            public void onSyncRequired(int localBudgetCount, int firebaseBudgetCount) {
+                // Show budget sync dialog
+                showBudgetSyncDialog(localBudgetCount, firebaseBudgetCount);
+            }
         });
     }
     
@@ -293,18 +317,15 @@ public class LoginActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess() {
                         android.util.Log.d("LoginActivity", "Orphaned activity cleanup completed");
-                        if (onComplete != null) {
-                            onComplete.run();
-                        }
+                        // Now fetch budget data from Firebase
+                        fetchFirebaseBudgetData(onComplete);
                     }
                     
                     @Override
                     public void onError(String error) {
                         android.util.Log.w("LoginActivity", "Orphaned activity cleanup failed: " + error);
-                        // Continue anyway - this is not critical
-                        if (onComplete != null) {
-                            onComplete.run();
-                        }
+                        // Continue anyway - this is not critical, but still fetch budget data
+                        fetchFirebaseBudgetData(onComplete);
                     }
                 });
             }
@@ -312,7 +333,31 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onError(String error) {
                 android.util.Log.e("LoginActivity", "Error fetching Firebase trips: " + error);
-                // Continue anyway - but skip cleanup since fetch failed
+                // Continue anyway - but still try to fetch budget data
+                fetchFirebaseBudgetData(onComplete);
+            }
+        });
+    }
+    
+    private void fetchFirebaseBudgetData(Runnable onComplete) {
+        android.util.Log.d("LoginActivity", "Fetching Firebase budget data...");
+        
+        com.example.mobiledegreefinalproject.repository.BudgetRepository budgetRepo = 
+            com.example.mobiledegreefinalproject.repository.BudgetRepository.getInstance(this);
+            
+        budgetRepo.fetchBudgetDataFromFirebase(new com.example.mobiledegreefinalproject.repository.BudgetRepository.OnBudgetFetchListener() {
+            @Override
+            public void onSuccess() {
+                android.util.Log.d("LoginActivity", "Firebase budget data fetched successfully");
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            }
+            
+            @Override
+            public void onError(String error) {
+                android.util.Log.w("LoginActivity", "Error fetching Firebase budget data: " + error);
+                // Continue anyway - budget data fetch is not critical for login
                 if (onComplete != null) {
                     onComplete.run();
                 }
@@ -358,7 +403,8 @@ public class LoginActivity extends AppCompatActivity {
             public void onSuccess() {
                 progressDialog.dismiss();
                 Toast.makeText(LoginActivity.this, "Trips synced successfully!", Toast.LENGTH_SHORT).show();
-                navigateToMainActivity();
+                // After trip sync, check budget sync
+                checkBudgetSyncStatus();
             }
             
             @Override
@@ -368,7 +414,8 @@ public class LoginActivity extends AppCompatActivity {
                         .setTitle("Sync Failed")
                         .setMessage("Failed to sync trips: " + error + "\n\nWould you like to continue anyway?")
                         .setPositiveButton("Continue", (dialog, which) -> {
-                            navigateToMainActivity();
+                            // Still check budget sync even if trip sync failed
+                            checkBudgetSyncStatus();
                         })
                         .setNegativeButton("Retry", (dialog, which) -> {
                             syncTripsToAccount();
@@ -380,7 +427,7 @@ public class LoginActivity extends AppCompatActivity {
             public void onSyncRequired(int localTripCount, int firebaseTripCount) {
                 // This shouldn't be called here
                 progressDialog.dismiss();
-                navigateToMainActivity();
+                checkBudgetSyncStatus();
             }
         });
     }
@@ -390,18 +437,99 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onSuccess() {
                 Toast.makeText(LoginActivity.this, "Local trips discarded", Toast.LENGTH_SHORT).show();
-                navigateToMainActivity();
+                // After discarding trips, check budget sync
+                checkBudgetSyncStatus();
             }
             
             @Override
             public void onError(String error) {
                 android.util.Log.e("LoginActivity", "Failed to discard local trips: " + error);
+                // Continue anyway and check budget sync
+                checkBudgetSyncStatus();
+            }
+            
+            @Override
+            public void onSyncRequired(int localTripCount, int firebaseTripCount) {
+                // This shouldn't be called here
+                checkBudgetSyncStatus();
+            }
+        });
+    }
+    
+    private void showBudgetSyncDialog(int localBudgetCount, int firebaseBudgetCount) {
+        String message = "Unsynced Budget Data Detected\n\n" +
+                        "You have " + localBudgetCount + " budget entries that were created while using the app without an account.\n\n" +
+                        "Would you like to sync this budget data to your account?";
+        
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Budget Sync")
+                .setMessage(message)
+                .setPositiveButton("🟢 Sync to Account", (dialog, which) -> {
+                    syncBudgetDataToAccount();
+                })
+                .setNegativeButton("🗑 Discard Local Budget Data", (dialog, which) -> {
+                    discardLocalBudgetData();
+                })
+                .setCancelable(false) // Force user to make a choice
+                .show();
+    }
+    
+    private void syncBudgetDataToAccount() {
+        // Show loading dialog
+        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+        progressDialog.setMessage("Syncing budget data to your account...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+        
+        userManager.syncLocalBudgetDataToFirebase(new UserManager.OnBudgetSyncListener() {
+            @Override
+            public void onSuccess() {
+                progressDialog.dismiss();
+                Toast.makeText(LoginActivity.this, "Budget data synced successfully!", Toast.LENGTH_SHORT).show();
+                navigateToMainActivity();
+            }
+            
+            @Override
+            public void onError(String error) {
+                progressDialog.dismiss();
+                new android.app.AlertDialog.Builder(LoginActivity.this)
+                        .setTitle("Budget Sync Failed")
+                        .setMessage("Failed to sync budget data: " + error + "\n\nWould you like to continue anyway?")
+                        .setPositiveButton("Continue", (dialog, which) -> {
+                            navigateToMainActivity();
+                        })
+                        .setNegativeButton("Retry", (dialog, which) -> {
+                            syncBudgetDataToAccount();
+                        })
+                        .show();
+            }
+            
+            @Override
+            public void onSyncRequired(int localBudgetCount, int firebaseBudgetCount) {
+                // This shouldn't be called here
+                progressDialog.dismiss();
+                navigateToMainActivity();
+            }
+        });
+    }
+    
+    private void discardLocalBudgetData() {
+        userManager.discardLocalBudgetData(new UserManager.OnBudgetSyncListener() {
+            @Override
+            public void onSuccess() {
+                Toast.makeText(LoginActivity.this, "Local budget data discarded", Toast.LENGTH_SHORT).show();
+                navigateToMainActivity();
+            }
+            
+            @Override
+            public void onError(String error) {
+                android.util.Log.e("LoginActivity", "Failed to discard local budget data: " + error);
                 // Continue anyway
                 navigateToMainActivity();
             }
             
             @Override
-            public void onSyncRequired(int localTripCount, int firebaseTripCount) {
+            public void onSyncRequired(int localBudgetCount, int firebaseBudgetCount) {
                 // This shouldn't be called here
                 navigateToMainActivity();
             }

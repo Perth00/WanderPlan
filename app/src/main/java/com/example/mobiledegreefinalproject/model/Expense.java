@@ -41,6 +41,11 @@ public class Expense {
     private Category category;
     private long timestamp;
     private String note;
+    
+    // Firebase support fields
+    private String firebaseId;
+    private int tripId;
+    private boolean synced = false;
 
     public Expense() {
         this.id = generateId();
@@ -58,6 +63,11 @@ public class Expense {
     public Expense(String title, double amount, Category category, String note) {
         this(title, amount, category);
         this.note = note;
+    }
+    
+    public Expense(String title, double amount, Category category, String note, int tripId) {
+        this(title, amount, category, note);
+        this.tripId = tripId;
     }
 
     private String generateId() {
@@ -113,6 +123,31 @@ public class Expense {
         this.note = note;
     }
 
+    // Firebase support getters and setters
+    public String getFirebaseId() {
+        return firebaseId;
+    }
+
+    public void setFirebaseId(String firebaseId) {
+        this.firebaseId = firebaseId;
+    }
+
+    public int getTripId() {
+        return tripId;
+    }
+
+    public void setTripId(int tripId) {
+        this.tripId = tripId;
+    }
+
+    public boolean isSynced() {
+        return synced;
+    }
+
+    public void setSynced(boolean synced) {
+        this.synced = synced;
+    }
+
     // Utility methods
     public String getFormattedDate() {
         SimpleDateFormat sdf = new SimpleDateFormat("dd MMM, yyyy", Locale.getDefault());
@@ -139,6 +174,8 @@ public class Expense {
                 ", amount=" + amount +
                 ", category=" + category +
                 ", timestamp=" + timestamp +
+                ", tripId=" + tripId +
+                ", firebaseId='" + firebaseId + '\'' +
                 '}';
     }
 }
