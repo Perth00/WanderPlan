@@ -666,63 +666,83 @@ public class TripRepository {
     private void deleteTripBudgetRecords(int tripId, String userEmail, Runnable onComplete) {
         Log.d(TAG, "Deleting budget records for trip ID: " + tripId);
         
-        firestore.collection("users")
-            .document(userEmail)
-            .collection("budgets")
-            .whereEqualTo("tripId", tripId)
-            .get()
-            .addOnSuccessListener(querySnapshot -> {
-                if (querySnapshot.isEmpty()) {
-                    Log.d(TAG, "No budget records found for trip " + tripId);
-                    onComplete.run();
+        // First get the trip's Firebase ID
+        executor.execute(() -> {
+            try {
+                Trip trip = tripDao.getTripByIdSync(tripId);
+                
+                if (trip == null || trip.getFirebaseId() == null || trip.getFirebaseId().isEmpty()) {
+                    Log.w(TAG, "Cannot delete budget records - trip not found or not synced to Firebase");
+                    onComplete.run(); // Continue anyway
                     return;
                 }
                 
-                Log.d(TAG, "Found " + querySnapshot.size() + " budget records to delete for trip " + tripId);
-                
-                // Delete each budget document
-                int totalDocs = querySnapshot.size();
-                final int[] deletedCount = {0};
-                final boolean[] hasError = {false};
-                
-                for (com.google.firebase.firestore.DocumentSnapshot document : querySnapshot) {
-                    document.getReference().delete()
-                        .addOnSuccessListener(aVoid -> {
-                            synchronized (deletedCount) {
-                                deletedCount[0]++;
-                                Log.d(TAG, "Deleted budget record: " + document.getId());
-                                
-                                if (deletedCount[0] >= totalDocs) {
-                                    // All deletions completed
-                                    if (hasError[0]) {
-                                        Log.w(TAG, "Some budget records could not be deleted, but continuing");
-                                    } else {
-                                        Log.d(TAG, "All budget records deleted successfully for trip " + tripId);
+                // CRITICAL FIX: Use correct Firebase collection path that matches BudgetRepository
+                // Delete entire budget collection for this trip: users/{email}/trips/{tripId}/budget/*
+                firestore.collection("users")
+                    .document(userEmail)
+                    .collection("trips")
+                    .document(trip.getFirebaseId())
+                    .collection("budget")
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        if (querySnapshot.isEmpty()) {
+                            Log.d(TAG, "No budget records found for trip " + tripId);
+                            onComplete.run();
+                            return;
+                        }
+                        
+                        Log.d(TAG, "Found " + querySnapshot.size() + " budget records to delete for trip " + tripId);
+                        
+                        // Delete each budget document
+                        int totalDocs = querySnapshot.size();
+                        final int[] deletedCount = {0};
+                        final boolean[] hasError = {false};
+                        
+                        for (com.google.firebase.firestore.DocumentSnapshot document : querySnapshot) {
+                            document.getReference().delete()
+                                .addOnSuccessListener(aVoid -> {
+                                    synchronized (deletedCount) {
+                                        deletedCount[0]++;
+                                        Log.d(TAG, "Deleted budget record: " + document.getId());
+                                        
+                                        if (deletedCount[0] >= totalDocs) {
+                                            // All deletions completed
+                                            if (hasError[0]) {
+                                                Log.w(TAG, "Some budget records could not be deleted, but continuing");
+                                            } else {
+                                                Log.d(TAG, "All budget records deleted successfully for trip " + tripId);
+                                            }
+                                            onComplete.run();
+                                        }
                                     }
-                                    onComplete.run();
-                                }
-                            }
-                        })
-                        .addOnFailureListener(e -> {
-                            synchronized (deletedCount) {
-                                deletedCount[0]++;
-                                hasError[0] = true;
-                                Log.e(TAG, "Error deleting budget record: " + document.getId(), e);
-                                
-                                if (deletedCount[0] >= totalDocs) {
-                                    // All deletions completed
-                                    Log.w(TAG, "Budget record deletion completed with errors for trip " + tripId);
-                                    onComplete.run();
-                                }
-                            }
-                        });
-                }
-            })
-            .addOnFailureListener(e -> {
-                Log.e(TAG, "Error fetching budget records for deletion", e);
-                // Continue anyway - don't let budget deletion failure block trip deletion
-                onComplete.run();
-            });
+                                })
+                                .addOnFailureListener(e -> {
+                                    synchronized (deletedCount) {
+                                        deletedCount[0]++;
+                                        hasError[0] = true;
+                                        Log.e(TAG, "Error deleting budget record: " + document.getId(), e);
+                                        
+                                        if (deletedCount[0] >= totalDocs) {
+                                            // All deletions completed
+                                            Log.w(TAG, "Budget record deletion completed with errors for trip " + tripId);
+                                            onComplete.run();
+                                        }
+                                    }
+                                });
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Error fetching budget records for deletion", e);
+                        // Continue anyway - don't let budget deletion failure block trip deletion
+                        onComplete.run();
+                    });
+                    
+            } catch (Exception e) {
+                Log.e(TAG, "Exception getting trip for budget deletion", e);
+                onComplete.run(); // Continue anyway
+            }
+        });
     }
     
     public LiveData<List<TripActivity>> getActivitiesForTrip(int tripId) {
@@ -860,6 +880,22 @@ public class TripRepository {
                 
                 // CRITICAL FIX: Add synchronization for logged-in users to prevent data corruption
                 synchronized (this) {
+                    // Step 0: Check for potential duplicates before saving
+                    if (userManager.isLoggedIn() && !FORCE_LOCAL_ONLY) {
+                        List<TripActivity> existingActivities = activityDao.getActivitiesForTripSync(activity.getTripId());
+                        for (TripActivity existing : existingActivities) {
+                            // Check if similar activity exists (same title and within 5 minutes)
+                            if (existing.getTitle().equals(activity.getTitle()) &&
+                                Math.abs(existing.getDateTime() - activity.getDateTime()) < 300000) { // 5 minutes
+                                Log.w(TAG, "Similar activity already exists, skipping duplicate insertion");
+                                if (listener != null) {
+                                    listener.onSuccess(existing.getId());
+                                }
+                                return;
+                            }
+                        }
+                    }
+                    
                     // Step 1: Save to local database first for immediate response
                     long activityId = activityDao.insertActivity(activity);
                     activity.setId((int) activityId);
@@ -880,6 +916,7 @@ public class TripRepository {
                         
                         if (trip.getFirebaseId() != null && !trip.getFirebaseId().isEmpty()) {
                             Log.d(TAG, "Trip has Firebase ID, syncing activity with timeout protection");
+                            
                             // Use timeout-protected sync operation to prevent hanging
                             syncActivityToFirebaseWithTimeout(activity, new OnActivityOperationListener() {
                                 @Override
@@ -906,6 +943,7 @@ public class TripRepository {
                                 @Override
                                 public void onSuccess(int tripSyncId) {
                                     Log.d(TAG, "✓ Trip synced successfully, now syncing activity");
+                                    
                                     syncActivityToFirebaseWithTimeout(activity, new OnActivityOperationListener() {
                                         @Override
                                         public void onSuccess(int syncedActivityId) {
@@ -1513,69 +1551,111 @@ public class TripRepository {
                 return;
             }
             
-            Map<String, Object> activityData = new HashMap<>();
-            activityData.put("title", activity.getTitle());
-            activityData.put("description", activity.getDescription());
-            activityData.put("location", activity.getLocation());
-            activityData.put("dateTime", activity.getDateTime());
-            activityData.put("dayNumber", activity.getDayNumber());
-            activityData.put("timeString", activity.getTimeString());
-            activityData.put("imageUrl", activity.getImageUrl() != null ? activity.getImageUrl() : "");
-            activityData.put("latitude", activity.getLatitude());
-            activityData.put("longitude", activity.getLongitude());
-            activityData.put("createdAt", activity.getCreatedAt());
-            activityData.put("updatedAt", activity.getUpdatedAt());
-            
+            // CRITICAL FIX: Check for existing activities in Firebase to prevent duplicates
             String userEmail = userManager.getUserEmail();
             
-            if (activity.getFirebaseId() != null) {
-                // Update existing activity
-                firestore.collection("users")
-                    .document(userEmail)
-                    .collection("trips")
-                    .document(trip.getFirebaseId())
-                    .collection("activities")
-                    .document(activity.getFirebaseId())
-                    .set(activityData)
-                    .addOnSuccessListener(aVoid -> {
-                        activityDao.markActivityAsSynced(activity.getId());
-                        if (listener != null) {
-                            listener.onSuccess(activity.getId());
+            firestore.collection("users")
+                .document(userEmail)
+                .collection("trips")
+                .document(trip.getFirebaseId())
+                .collection("activities")
+                .whereEqualTo("title", activity.getTitle())
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    // Check if similar activity already exists in Firebase
+                    boolean duplicateFound = false;
+                    for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
+                        Long existingDateTime = doc.getLong("dateTime");
+                        if (existingDateTime != null && 
+                            Math.abs(existingDateTime - activity.getDateTime()) < 300000) { // 5 minutes
+                            Log.w(TAG, "Duplicate activity found in Firebase, skipping sync");
+                            duplicateFound = true;
+                            // Update local activity with Firebase ID to prevent future sync attempts
+                            activity.setFirebaseId(doc.getId());
+                            activityDao.updateActivityFirebaseId(activity.getId(), doc.getId());
+                            if (listener != null) {
+                                listener.onSuccess(activity.getId());
+                            }
+                            break;
                         }
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Error syncing activity to Firebase", e);
-                        if (listener != null) {
-                            listener.onError("Failed to sync activity: " + e.getMessage());
-                        }
-                    });
-            } else {
-                // Create new activity
-                firestore.collection("users")
-                    .document(userEmail)
-                    .collection("trips")
-                    .document(trip.getFirebaseId())
-                    .collection("activities")
-                    .add(activityData)
-                    .addOnSuccessListener(documentReference -> {
-                        String firebaseId = documentReference.getId();
-                        // CRITICAL FIX: Update both database AND the activity object in memory
-                        activityDao.updateActivityFirebaseId(activity.getId(), firebaseId);
-                        activity.setFirebaseId(firebaseId);  // This was missing!
-                        activity.setSynced(true);
-                        Log.d(TAG, "✓ Firebase ID updated in memory for activity: " + activity.getTitle() + " -> " + firebaseId);
-                        if (listener != null) {
-                            listener.onSuccess(activity.getId());
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Error creating activity in Firebase", e);
-                        if (listener != null) {
-                            listener.onError("Failed to sync activity: " + e.getMessage());
-                        }
-                    });
-            }
+                    }
+                    
+                    if (!duplicateFound) {
+                        // Proceed with normal sync
+                        performFirebaseSync(activity, trip, listener);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "Error checking for duplicates, proceeding with sync", e);
+                    // If duplicate check fails, proceed with sync anyway
+                    performFirebaseSync(activity, trip, listener);
+                });
         });
+    }
+    
+    private void performFirebaseSync(TripActivity activity, Trip trip, OnActivityOperationListener listener) {
+        Map<String, Object> activityData = new HashMap<>();
+        activityData.put("title", activity.getTitle());
+        activityData.put("description", activity.getDescription());
+        activityData.put("location", activity.getLocation());
+        activityData.put("dateTime", activity.getDateTime());
+        activityData.put("dayNumber", activity.getDayNumber());
+        activityData.put("timeString", activity.getTimeString());
+        activityData.put("imageUrl", activity.getImageUrl() != null ? activity.getImageUrl() : "");
+        activityData.put("latitude", activity.getLatitude());
+        activityData.put("longitude", activity.getLongitude());
+        activityData.put("createdAt", activity.getCreatedAt());
+        activityData.put("updatedAt", activity.getUpdatedAt());
+        
+        String userEmail = userManager.getUserEmail();
+        
+        if (activity.getFirebaseId() != null) {
+            // Update existing activity
+            firestore.collection("users")
+                .document(userEmail)
+                .collection("trips")
+                .document(trip.getFirebaseId())
+                .collection("activities")
+                .document(activity.getFirebaseId())
+                .set(activityData)
+                .addOnSuccessListener(aVoid -> {
+                    activityDao.markActivityAsSynced(activity.getId());
+                    if (listener != null) {
+                        listener.onSuccess(activity.getId());
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error syncing activity to Firebase", e);
+                    if (listener != null) {
+                        listener.onError("Failed to sync activity: " + e.getMessage());
+                    }
+                });
+        } else {
+            // Create new activity
+            firestore.collection("users")
+                .document(userEmail)
+                .collection("trips")
+                .document(trip.getFirebaseId())
+                .collection("activities")
+                .add(activityData)
+                .addOnSuccessListener(documentReference -> {
+                    String firebaseId = documentReference.getId();
+                    // CRITICAL FIX: Update both database AND the activity object in memory
+                    activityDao.updateActivityFirebaseId(activity.getId(), firebaseId);
+                    activity.setFirebaseId(firebaseId);  // This was missing!
+                    activity.setSynced(true);
+                    Log.d(TAG, "✓ Firebase ID updated in memory for activity: " + activity.getTitle() + " -> " + firebaseId);
+                    if (listener != null) {
+                        listener.onSuccess(activity.getId());
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error creating activity in Firebase", e);
+                    if (listener != null) {
+                        listener.onError("Failed to sync activity: " + e.getMessage());
+                    }
+                });
+        }
     }
     
     // CRITICAL FIX: Add timeout-protected Firebase sync to prevent hanging operations

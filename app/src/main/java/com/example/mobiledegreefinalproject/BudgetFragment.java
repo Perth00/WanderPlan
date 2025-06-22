@@ -1141,6 +1141,30 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                 .setMessage("Are you sure you want to delete \"" + expense.getTitle() + "\"?")
                 .setPositiveButton("Delete", (dialog, which) -> {
                     try {
+                        // CRITICAL FIX: Also delete from Firebase if user is logged in
+                        if (userManager != null && userManager.isLoggedIn() && budgetRepository != null) {
+                            // Get the trip ID for this expense
+                            int tripId = expense.getTripId();
+                            if (tripId <= 0 && selectedTrip != null) {
+                                tripId = selectedTrip.getId();
+                            }
+                            
+                            if (tripId > 0) {
+                                budgetRepository.deleteExpenseFromFirebase(expense, tripId, new BudgetRepository.OnBudgetOperationListener() {
+                                    @Override
+                                    public void onSuccess() {
+                                        Log.d(TAG, "Expense deleted from Firebase successfully: " + expense.getTitle());
+                                    }
+                                    
+                                    @Override
+                                    public void onError(String error) {
+                                        Log.w(TAG, "Failed to delete expense from Firebase: " + error);
+                                        // Don't show error to user - expense is still deleted locally
+                                    }
+                                });
+                            }
+                        }
+                        
                         // Remove from current expenses list
                         expenses.remove(expense);
                         
@@ -1148,6 +1172,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                         if (selectedTrip != null) {
                             List<Expense> tripExpenseList = tripExpenses.get(selectedTrip.getId());
                             if (tripExpenseList != null) {
+                                tripExpenseList.remove(expense);
+                            }
+                        } else {
+                            // If "All Trips" is selected, find and remove from the correct trip's list
+                            for (List<Expense> tripExpenseList : tripExpenses.values()) {
                                 tripExpenseList.remove(expense);
                             }
                         }
@@ -1172,7 +1201,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                 .setNegativeButton("Cancel", null)
                 .show();
         } catch (Exception e) {
-            Log.e(TAG, "Error showing delete dialog", e);
+            Log.e(TAG, "Error showing delete confirmation dialog", e);
             showErrorToast("Error showing delete dialog");
         }
     }

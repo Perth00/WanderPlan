@@ -346,22 +346,37 @@ public class AddActivityActivity extends AppCompatActivity {
             return;
         }
         
+        // CRITICAL FIX: Validate that we have valid trip data
         if (currentTrip == null) {
-            Toast.makeText(this, "Trip data not loaded", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Trip data not loaded, please try again", Toast.LENGTH_SHORT).show();
+            loadTripData(); // Try to reload trip data
             return;
         }
-        
-        setLoadingState(true);
         
         // Calculate day number
         int dayNumber = calculateDayNumber(selectedDateTime.getTimeInMillis(), currentTrip.getStartDate());
         
-        if (selectedImageUri != null) {
-            // Upload image first, then save activity
-            uploadImageAndSaveActivity(title, description, location, dayNumber);
-        } else {
-            // Save activity without new image
-            saveActivityToDatabase(title, description, location, dayNumber, uploadedImageUrl);
+        // Show loading
+        setLoadingState(true);
+        
+        // CRITICAL FIX: Add flag to prevent double saves
+        if (btnSaveActivity.getTag() != null && btnSaveActivity.getTag().equals("saving")) {
+            Log.w(TAG, "Save already in progress, ignoring duplicate request");
+            return;
+        }
+        btnSaveActivity.setTag("saving");
+        
+        try {
+            if (selectedImageUri != null) {
+                uploadImageAndSaveActivity(title, description, location, dayNumber);
+            } else {
+                saveActivityToDatabase(title, description, location, dayNumber, uploadedImageUrl);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in saveActivity", e);
+            setLoadingState(false);
+            btnSaveActivity.setTag(null); // Reset flag
+            Toast.makeText(this, "Error saving activity", Toast.LENGTH_SHORT).show();
         }
     }
     
@@ -384,6 +399,7 @@ public class AddActivityActivity extends AppCompatActivity {
         if (isFinishing() || isDestroyed()) {
             Log.w(TAG, "Activity is finishing/destroyed, skipping image upload");
             setLoadingState(false);
+            btnSaveActivity.setTag(null); // Reset flag
             return;
         }
         
@@ -392,8 +408,8 @@ public class AddActivityActivity extends AppCompatActivity {
             Glide.with(this)
                 .asBitmap()
                 .load(selectedImageUri)
-                .override(256, 256) // Reasonable size for better performance
-                .timeout(30000) // 30 second timeout
+                .override(512, 512) // Reasonable size for better performance
+                .timeout(20000) // 20 second timeout
                 .into(new CustomTarget<Bitmap>() {
                     @Override
                     public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
@@ -402,6 +418,7 @@ public class AddActivityActivity extends AppCompatActivity {
                             uploadBitmapToFirebase(resource, title, description, location, dayNumber);
                         } else {
                             Log.w(TAG, "Activity destroyed during image processing, saving locally");
+                            btnSaveActivity.setTag(null); // Reset flag
                             saveActivityToDatabase(title, description, location, dayNumber, null);
                         }
                     }
@@ -412,6 +429,8 @@ public class AddActivityActivity extends AppCompatActivity {
                         Log.w(TAG, "Image loading cancelled, saving activity without image");
                         if (!isFinishing() && !isDestroyed()) {
                             saveActivityToDatabase(title, description, location, dayNumber, null);
+                        } else {
+                            btnSaveActivity.setTag(null); // Reset flag
                         }
                     }
                     
@@ -420,11 +439,14 @@ public class AddActivityActivity extends AppCompatActivity {
                         Log.e(TAG, "Image loading failed, saving activity without image");
                         if (!isFinishing() && !isDestroyed()) {
                             saveActivityToDatabase(title, description, location, dayNumber, null);
+                        } else {
+                            btnSaveActivity.setTag(null); // Reset flag
                         }
                     }
                 });
         } catch (Exception e) {
             Log.e(TAG, "Error setting up image upload", e);
+            btnSaveActivity.setTag(null); // Reset flag
             // Fallback to saving without image
             saveActivityToDatabase(title, description, location, dayNumber, null);
         }
@@ -434,23 +456,24 @@ public class AddActivityActivity extends AppCompatActivity {
         // CRITICAL FIX: Check activity state before Firebase operations
         if (isFinishing() || isDestroyed()) {
             Log.w(TAG, "Activity finishing/destroyed, saving locally without image upload");
+            btnSaveActivity.setTag(null); // Reset flag
             saveActivityToDatabase(title, description, location, dayNumber, null);
             return;
         }
         
         try {
             ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 50, byteStream); // Better quality but still compressed
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteStream); // Better quality but still compressed
             byte[] data = byteStream.toByteArray();
             
             // Limit file size to prevent crashes
-            if (data.length > 1024 * 1024) { // 1MB limit
-                Log.w(TAG, "Image too large, saving without upload");
+            if (data.length > 1024 * 1024 * 2) { // 2MB limit
+                Log.w(TAG, "Image too large (" + (data.length / 1024 / 1024) + "MB), saving without upload");
                 saveActivityToDatabase(title, description, location, dayNumber, null);
                 return;
             }
             
-            String fileName = "activity_" + System.currentTimeMillis() + ".jpg";
+            String fileName = "activity_" + System.currentTimeMillis() + "_" + title.replaceAll("[^a-zA-Z0-9]", "") + ".jpg";
             StorageReference storageRef = FirebaseStorage.getInstance().getReference()
                 .child("activity_images")
                 .child(fileName);
@@ -464,6 +487,7 @@ public class AddActivityActivity extends AppCompatActivity {
                     if (!uploadCompleted[0]) {
                         uploadCompleted[0] = true;
                         Log.w(TAG, "Firebase upload timeout, saving without image");
+                        btnSaveActivity.setTag(null); // Reset flag
                         if (!isFinishing() && !isDestroyed()) {
                             saveActivityToDatabase(title, description, location, dayNumber, null);
                         }
@@ -471,8 +495,8 @@ public class AddActivityActivity extends AppCompatActivity {
                 }
             };
             
-            // Set 30-second timeout for upload
-            timeoutHandler.postDelayed(timeoutRunnable, 30000);
+            // Set 25-second timeout for upload
+            timeoutHandler.postDelayed(timeoutRunnable, 25000);
             
             storageRef.putBytes(data)
                 .addOnSuccessListener(taskSnapshot -> {
@@ -486,8 +510,8 @@ public class AddActivityActivity extends AppCompatActivity {
                         if (isFinishing() || isDestroyed()) {
                             uploadCompleted[0] = true;
                             timeoutHandler.removeCallbacks(timeoutRunnable);
-                            Log.w(TAG, "Activity destroyed after upload success, saving locally");
-                            saveActivityToDatabase(title, description, location, dayNumber, null);
+                            Log.w(TAG, "Activity destroyed after upload success, not saving");
+                            btnSaveActivity.setTag(null); // Reset flag
                             return;
                         }
                         
@@ -499,6 +523,8 @@ public class AddActivityActivity extends AppCompatActivity {
                                         timeoutHandler.removeCallbacks(timeoutRunnable);
                                         String imageUrl = uri.toString();
                                         saveActivityToDatabase(title, description, location, dayNumber, imageUrl);
+                                    } else {
+                                        btnSaveActivity.setTag(null); // Reset flag
                                     }
                                 }
                             })
@@ -508,6 +534,7 @@ public class AddActivityActivity extends AppCompatActivity {
                                         uploadCompleted[0] = true;
                                         timeoutHandler.removeCallbacks(timeoutRunnable);
                                         Log.e(TAG, "Error getting download URL", e);
+                                        btnSaveActivity.setTag(null); // Reset flag
                                         if (!isFinishing() && !isDestroyed()) {
                                             saveActivityToDatabase(title, description, location, dayNumber, null);
                                         }
@@ -522,6 +549,7 @@ public class AddActivityActivity extends AppCompatActivity {
                             uploadCompleted[0] = true;
                             timeoutHandler.removeCallbacks(timeoutRunnable);
                             Log.e(TAG, "Error uploading image", e);
+                            btnSaveActivity.setTag(null); // Reset flag
                             if (!isFinishing() && !isDestroyed()) {
                                 saveActivityToDatabase(title, description, location, dayNumber, null);
                             }
@@ -531,6 +559,7 @@ public class AddActivityActivity extends AppCompatActivity {
                 
         } catch (Exception e) {
             Log.e(TAG, "Error processing image for Firebase", e);
+            btnSaveActivity.setTag(null); // Reset flag
             if (!isFinishing() && !isDestroyed()) {
                 saveActivityToDatabase(title, description, location, dayNumber, null);
             }
@@ -541,6 +570,7 @@ public class AddActivityActivity extends AppCompatActivity {
         // CRITICAL FIX: Check activity state before database operations
         if (isFinishing() || isDestroyed()) {
             Log.w(TAG, "Activity is finishing/destroyed, skipping database save");
+            btnSaveActivity.setTag(null); // Reset flag
             return;
         }
         
@@ -565,6 +595,7 @@ public class AddActivityActivity extends AppCompatActivity {
                     runOnUiThread(() -> {
                         if (!isFinishing() && !isDestroyed()) {
                             setLoadingState(false);
+                            btnSaveActivity.setTag(null); // Reset flag
                             Toast.makeText(AddActivityActivity.this, "Error: Activity data not found", Toast.LENGTH_SHORT).show();
                         }
                     });
@@ -596,6 +627,7 @@ public class AddActivityActivity extends AppCompatActivity {
                                 try {
                                     if (!isFinishing() && !isDestroyed()) {
                                         setLoadingState(false);
+                                        btnSaveActivity.setTag(null); // Reset flag
                                         Toast.makeText(AddActivityActivity.this, "Activity saved successfully!", Toast.LENGTH_SHORT).show();
                                         // Set RESULT_OK to trigger refresh in TripDetailActivity
                                         setResult(RESULT_OK);
@@ -604,6 +636,7 @@ public class AddActivityActivity extends AppCompatActivity {
                                 } catch (Exception e) {
                                     Log.e(TAG, "Error in success UI update", e);
                                     // Still finish the activity to prevent hanging
+                                    btnSaveActivity.setTag(null); // Reset flag
                                     if (!isFinishing()) {
                                         setResult(RESULT_OK); // Still indicate success
                                         finish();
@@ -614,12 +647,14 @@ public class AddActivityActivity extends AppCompatActivity {
                             Log.w(TAG, "Activity finishing/destroyed during success callback");
                             // Still set result if possible
                             try {
+                                btnSaveActivity.setTag(null); // Reset flag
                                 setResult(RESULT_OK);
                             } catch (Exception ignored) {}
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error running on UI thread in success", e);
                         try {
+                            btnSaveActivity.setTag(null); // Reset flag
                             setResult(RESULT_OK); // Ensure success is indicated
                             if (!isFinishing()) {
                                 finish(); // Ensure activity closes
@@ -637,6 +672,7 @@ public class AddActivityActivity extends AppCompatActivity {
                                 try {
                                     if (!isFinishing() && !isDestroyed()) {
                                         setLoadingState(false);
+                                        btnSaveActivity.setTag(null); // Reset flag
                                         String userMessage = "Failed to save activity";
                                         if (error.contains("timeout") || error.contains("network")) {
                                             userMessage = "Network issue - activity may be saved locally";
@@ -645,11 +681,15 @@ public class AddActivityActivity extends AppCompatActivity {
                                     }
                                 } catch (Exception e) {
                                     Log.e(TAG, "Error in error UI update", e);
+                                    btnSaveActivity.setTag(null); // Reset flag
                                 }
                             });
+                        } else {
+                            btnSaveActivity.setTag(null); // Reset flag
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error running on UI thread in error", e);
+                        btnSaveActivity.setTag(null); // Reset flag
                     }
                 }
             };
@@ -665,6 +705,7 @@ public class AddActivityActivity extends AppCompatActivity {
             
         } catch (Exception e) {
             Log.e(TAG, "CRITICAL: Exception in saveActivityToDatabase", e);
+            btnSaveActivity.setTag(null); // Reset flag
             if (!isFinishing() && !isDestroyed()) {
                 runOnUiThread(() -> {
                     try {
