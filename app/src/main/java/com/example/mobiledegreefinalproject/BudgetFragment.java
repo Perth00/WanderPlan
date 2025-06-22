@@ -1277,17 +1277,38 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                             expenses.stream().anyMatch(expense -> expense.getAmount() > 0);
                         
                         if (hasExistingExpenses) {
-                            // Show immediate warning
+                            // Show immediate strong warning
                             new AlertDialog.Builder(context)
-                                .setTitle("⚠️ Warning: Data Loss Risk")
-                                .setMessage("Checking this option will REPLACE ALL your current expense records!\n\n" +
-                                    "Your existing expenses will be permanently deleted when you click 'Set Budget'.\n\n" +
-                                    "Do you want to continue?")
-                                .setPositiveButton("Yes, I understand", null)
-                                .setNegativeButton("Cancel", (dialog, which) -> {
+                                .setTitle("🚨 CRITICAL WARNING: Data Will Be Lost!")
+                                .setMessage("⚠️ DANGER: This action will PERMANENTLY DELETE all your current budget records!\n\n" +
+                                    "✗ ALL your existing expenses will be erased\n" +
+                                    "✗ This action CANNOT be undone\n" +
+                                    "✗ You will lose all your current budget data\n\n" +
+                                    "⚡ Only check this if you want to start fresh with default categories.\n\n" +
+                                    "Are you absolutely sure you want to REPLACE ALL your budget records?")
+                                .setPositiveButton("⚠️ Yes, DELETE ALL my records", null)
+                                .setNegativeButton("❌ No, Keep my data", (dialog, which) -> {
                                     finalCheckbox.setChecked(false);
                                 })
                                 .setIcon(android.R.drawable.ic_dialog_alert)
+                                .setCancelable(false)
+                                .show();
+                        } else {
+                            // No existing data, show informational message
+                            new AlertDialog.Builder(context)
+                                .setTitle("ℹ️ Add Default Categories")
+                                .setMessage("This will add 6 default budget categories:\n\n" +
+                                    "• Food & Dining (RM 0)\n" +
+                                    "• Transportation (RM 0)\n" +
+                                    "• Accommodation (RM 0)\n" +
+                                    "• Activities & Tours (RM 0)\n" +
+                                    "• Shopping (RM 0)\n" +
+                                    "• Miscellaneous (RM 0)\n\n" +
+                                    "You can edit these amounts later.")
+                                .setPositiveButton("✅ Add Categories", null)
+                                .setNegativeButton("Cancel", (dialog, which) -> {
+                                    finalCheckbox.setChecked(false);
+                                })
                                 .show();
                         }
                     }
@@ -1422,22 +1443,28 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             }
             
             new AlertDialog.Builder(context)
-                .setTitle("⚠️ Warning: Data Loss")
-                .setMessage("Adding default categories will replace ALL your current expense records!\n\n" +
-                    "This action cannot be undone. All your existing expenses will be permanently deleted.\n\n" +
-                    "Are you sure you want to continue?")
-                .setPositiveButton("Yes, Replace All", (dialog, which) -> {
+                .setTitle("🚨 FINAL WARNING: Data Deletion Confirmed!")
+                .setMessage("🔥 THIS IS YOUR LAST CHANCE TO SAVE YOUR DATA!\n\n" +
+                    "⚠️ CRITICAL ACTION: You are about to PERMANENTLY DELETE:\n\n" +
+                    "🗑️ ALL your current budget records\n" +
+                    "🗑️ ALL your expense entries\n" +
+                    "🗑️ ALL your spending history\n\n" +
+                    "❌ This action is IRREVERSIBLE\n" +
+                    "❌ Your data will be GONE FOREVER\n\n" +
+                    "💡 If you're not 100% sure, click 'Cancel' to keep your existing data.\n\n" +
+                    "Are you completely certain you want to DELETE ALL your budget records?")
+                .setPositiveButton("🔥 YES, DELETE EVERYTHING", (dialog, which) -> {
                     if (onConfirm != null) {
                         onConfirm.run();
                     }
                 })
-                .setNegativeButton("Cancel", (dialog, which) -> {
+                .setNegativeButton("🛡️ CANCEL - Keep my data", (dialog, which) -> {
                     // User cancelled, just update budget without adding categories
                     saveBudgetData();
                     updateBudgetDisplay();
                     updateChartData();
                     updateEmptyState();
-                    showErrorToast("Budget updated without changing expense records");
+                    showErrorToast("✅ Budget updated safely - your expense records are preserved");
                 })
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .setCancelable(false)

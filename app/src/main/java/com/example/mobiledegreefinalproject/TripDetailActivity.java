@@ -267,7 +267,7 @@ public class TripDetailActivity extends AppCompatActivity {
         int id = item.getItemId();
         
         if (id == R.id.action_sync) {
-            forceSyncActivities();
+            showComingSoonSyncDialog();
             return true;
         } else if (id == R.id.action_delete_trip) {
             showDeleteTripDialog();
@@ -277,35 +277,19 @@ public class TripDetailActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private void forceSyncActivities() {
-        if (infoPanelManager != null) {
-            infoPanelManager.showSyncInProgress();
-        }
-        
-        if (tripId != -1) {
-            com.example.mobiledegreefinalproject.repository.TripRepository repository = 
-                com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
-            
-            repository.forceSyncTripActivities(tripId, new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
-                @Override
-                public void onSuccess() {
-                    Log.d(TAG, "Force sync completed successfully");
-                    if (infoPanelManager != null) {
-                        infoPanelManager.showSyncSuccess();
-                    }
-                }
-                
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "Force sync failed: " + error);
-                    if (infoPanelManager != null) {
-                        infoPanelManager.showSyncError(error);
-                    }
-                }
-            });
-        }
+    private void showComingSoonSyncDialog() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("🔄 Trip Sync")
+                .setMessage("🚧 Sync Feature Coming Soon!\n\n" +
+                           "We're working on improving the trip synchronization feature.\n\n" +
+                           "📱 Your activities are automatically saved locally\n" +
+                           "☁️ Cloud sync will be available in the next update\n\n" +
+                           "Stay tuned for enhanced data synchronization!")
+                .setPositiveButton("Got it", null)
+                .setIcon(android.R.drawable.ic_popup_sync)
+                .show();
     }
-    
+
     private void forceSyncActivitiesQuiet() {
         if (tripId != -1) {
             com.example.mobiledegreefinalproject.repository.TripRepository repository = 
