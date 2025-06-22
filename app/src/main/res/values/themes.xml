@@ -168,4 +168,52 @@
         <item name="android:layout_marginStart">16dp</item>
         <item name="android:layout_marginEnd">16dp</item>
     </style>
+    
+    <!-- Category Chip Styles -->
+    <style name="WanderPlan.Chip.Category" parent="Widget.Material3.Chip.Filter">
+        <item name="chipCornerRadius">16dp</item>
+        <item name="chipMinHeight">32dp</item>
+        <item name="chipStartPadding">8dp</item>
+        <item name="chipEndPadding">8dp</item>
+        <item name="chipIconSize">18dp</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    
+    <style name="WanderPlan.Chip.Category.Food" parent="WanderPlan.Chip.Category">
+        <item name="chipBackgroundColor">@color/primary_light</item>
+        <item name="android:textColor">@color/primary</item>
+        <item name="chipIcon">@drawable/ic_food</item>
+    </style>
+    
+    <style name="WanderPlan.Chip.Category.Transport" parent="WanderPlan.Chip.Category">
+        <item name="chipBackgroundColor">@color/secondary_variant</item>
+        <item name="android:textColor">@color/secondary</item>
+        <item name="chipIcon">@drawable/ic_transport</item>
+    </style>
+    
+    <style name="WanderPlan.Chip.Category.Hotel" parent="WanderPlan.Chip.Category">
+        <item name="chipBackgroundColor">@color/info</item>
+        <item name="android:textColor">@color/navy</item>
+        <item name="chipIcon">@drawable/ic_accommodation</item>
+    </style>
+    
+    <style name="WanderPlan.Chip.Category.Activities" parent="WanderPlan.Chip.Category">
+        <item name="chipBackgroundColor">@color/warning</item>
+        <item name="android:textColor">@color/dark_grey</item>
+        <item name="chipIcon">@drawable/ic_budget</item>
+    </style>
+    
+    <style name="WanderPlan.Chip.Category.Shopping" parent="WanderPlan.Chip.Category">
+        <item name="chipBackgroundColor">@color/lavender</item>
+        <item name="android:textColor">@color/navy</item>
+        <item name="chipIcon">@drawable/ic_shopping</item>
+    </style>
+    
+    <style name="WanderPlan.Chip.Category.Other" parent="WanderPlan.Chip.Category">
+        <item name="chipBackgroundColor">@color/medium_grey</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="chipIcon">@drawable/ic_settings</item>
+    </style>
 </resources>

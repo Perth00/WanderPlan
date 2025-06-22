@@ -12,6 +12,11 @@ public class MainActivity extends AppCompatActivity {
 
     private BottomNavigationView bottomNavigation;
     private UserManager userManager;
+    
+    // Interface for communicating between fragments
+    public interface TripDeletionListener {
+        void onTripDeleted(int tripId);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,6 +120,43 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+    }
+
+    /**
+     * Call this method when a trip is deleted to notify all relevant fragments
+     */
+    public void notifyTripDeleted(int tripId) {
+        android.util.Log.d("MainActivity", "=== MAIN ACTIVITY TRIP DELETION NOTIFICATION ===");
+        android.util.Log.d("MainActivity", "Notifying fragments about trip deletion: " + tripId);
+        
+        // Find and notify BudgetFragment if it's currently active or in backstack
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        android.util.Log.d("MainActivity", "Current fragment: " + (currentFragment != null ? currentFragment.getClass().getSimpleName() : "null"));
+        
+        boolean budgetFragmentNotified = false;
+        
+        if (currentFragment instanceof BudgetFragment) {
+            android.util.Log.d("MainActivity", "Notifying current BudgetFragment");
+            ((BudgetFragment) currentFragment).onTripDeleted(tripId);
+            budgetFragmentNotified = true;
+        }
+        
+        // Also notify if there's a BudgetFragment in the backstack
+        android.util.Log.d("MainActivity", "Checking fragments in backstack, total fragments: " + getSupportFragmentManager().getFragments().size());
+        for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+            android.util.Log.d("MainActivity", "Fragment in backstack: " + fragment.getClass().getSimpleName());
+            if (fragment instanceof BudgetFragment && fragment != currentFragment) {
+                android.util.Log.d("MainActivity", "Notifying BudgetFragment in backstack");
+                ((BudgetFragment) fragment).onTripDeleted(tripId);
+                budgetFragmentNotified = true;
+            }
+        }
+        
+        if (!budgetFragmentNotified) {
+            android.util.Log.w("MainActivity", "No BudgetFragment found to notify!");
+        }
+        
+        android.util.Log.d("MainActivity", "=== NOTIFICATION COMPLETE ===");
     }
 
     public String getUserName() {

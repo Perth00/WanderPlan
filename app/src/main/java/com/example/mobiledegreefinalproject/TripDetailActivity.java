@@ -458,6 +458,13 @@ public class TripDetailActivity extends AppCompatActivity {
                     infoPanelManager.showTripDeletedMessage();
                 }
                 
+                // Notify MainActivity to inform other fragments about trip deletion
+                if (TripDetailActivity.this instanceof android.app.Activity) {
+                    android.content.Intent intent = new android.content.Intent();
+                    intent.putExtra("deleted_trip_id", tripId);
+                    setResult(android.app.Activity.RESULT_OK, intent);
+                }
+                
                 // Navigate back to trips list after a short delay
                 new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                     finish();

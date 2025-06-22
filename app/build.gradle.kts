@@ -64,11 +64,17 @@ dependencies {
     // Animations
     implementation(libs.lottie)
     
+    // Charts
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    
+    // JSON Serialization  
+    implementation("com.google.code.gson:gson:2.13.1")
+    
     // Image Loading
     implementation(libs.glide)
     
     // Firebase
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation(platform("com.google.firebase:firebase-bom:33.15.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
