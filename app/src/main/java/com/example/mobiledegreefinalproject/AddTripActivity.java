@@ -204,14 +204,18 @@ public class AddTripActivity extends AppCompatActivity {
                         try {
                             setLoadingState(false);
                             Log.d(TAG, "Trip saved successfully with ID: " + tripId);
-                            Toast.makeText(AddTripActivity.this, "Trip saved successfully!", Toast.LENGTH_SHORT).show();
                             
-                            // Add small delay to ensure UI updates complete before finishing
-                            new android.os.Handler().postDelayed(() -> {
-                                if (!AddTripActivity.this.isDestroyed() && !AddTripActivity.this.isFinishing()) {
-                                    finish();
+                            // Show success animation and sound
+                            SuccessDialogHelper.showSuccessDialog(
+                                AddTripActivity.this, 
+                                getString(R.string.trip_created_successfully),
+                                () -> {
+                                    // Callback when dialog is dismissed
+                                    if (!AddTripActivity.this.isDestroyed() && !AddTripActivity.this.isFinishing()) {
+                                        finish();
+                                    }
                                 }
-                            }, 500);
+                            );
                             
                         } catch (Exception e) {
                             Log.e(TAG, "Error in success callback UI updates", e);
@@ -310,6 +314,7 @@ public class AddTripActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         try {
+            SuccessDialogHelper.releaseMediaPlayer();
             super.onDestroy();
         } catch (Exception e) {
             Log.e(TAG, "Error in onDestroy", e);

@@ -78,6 +78,11 @@ public class DataSyncService {
         void onError(String error);
     }
     
+    public interface OnActivitySaveListener {
+        void onSuccess(String firebaseId);
+        void onError(String error);
+    }
+    
     /**
      * Sync all local data to Firebase as JSON
      */
@@ -512,6 +517,7 @@ public class DataSyncService {
         updateData.put("location", activity.getLocation());
         updateData.put("timeString", activity.getTimeString());
         updateData.put("updatedAt", System.currentTimeMillis());
+        updateData.put("platform", "android"); // CRITICAL FIX: Ensure platform field on updates
         
         // Only update image URL if we have a new Firebase URL
         if (firebaseImageUrl != null) {
@@ -549,16 +555,8 @@ public class DataSyncService {
                                  String firebaseImageUrl, AtomicInteger completedActivities, 
                                  int totalActivities, OnTripSyncListener listener) {
         
-        // Create activity data (same as existing activity management)
-        Map<String, Object> activityData = new HashMap<>();
-        activityData.put("title", activity.getTitle());
-        activityData.put("description", activity.getDescription());
-        activityData.put("location", activity.getLocation());
-        activityData.put("dateTime", activity.getDateTime());
-        activityData.put("dayNumber", activity.getDayNumber());
-        activityData.put("timeString", activity.getTimeString());
-        activityData.put("createdAt", activity.getCreatedAt());
-        activityData.put("updatedAt", activity.getUpdatedAt());
+                    // Create activity data using standardized helper
+            Map<String, Object> activityData = FirebaseDataHelper.activityToFirebaseData(activity);
         
         // Add image URL (Firebase URL if uploaded, existing URL if already Firebase, or empty if none)
         if (firebaseImageUrl != null) {
@@ -903,5 +901,167 @@ public class DataSyncService {
         if (syncException[0] != null) {
             throw syncException[0];
         }
+    }
+
+    /**
+     * Save a single activity as JSON directly to Firebase
+     * This approach is more reliable than complex database sync
+     */
+    public void saveActivityAsJson(TripActivity activity, Trip trip, OnActivitySaveListener listener) {
+        UserManager userManager = UserManager.getInstance(context);
+        
+        if (!userManager.isLoggedIn()) {
+            Log.e(TAG, "User not logged in for activity save");
+            listener.onError("User not authenticated");
+            return;
+        }
+        
+        String userEmail = userManager.getUserEmail();
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            Log.e(TAG, "User email is null or empty");
+            listener.onError("User email not available");
+            return;
+        }
+        
+        try {
+            Log.d(TAG, "=== SAVING ACTIVITY AS JSON ===");
+            Log.d(TAG, "Activity: " + activity.getTitle());
+            Log.d(TAG, "Trip: " + trip.getTitle());
+            Log.d(TAG, "User Email: " + userEmail);
+            
+            // Create activity JSON data using standardized helper
+            Map<String, Object> activityData = FirebaseDataHelper.activityToFirebaseData(activity);
+            
+            // CRITICAL FIX: Handle imageUrl exactly like bulk sync
+            if (activity.getImageUrl() != null && activity.getImageUrl().startsWith("https://firebasestorage.googleapis.com")) {
+                activityData.put("imageUrl", activity.getImageUrl());
+                Log.d(TAG, "🖼️ Including existing Firebase image URL in direct creation");
+            } else if (activity.getImageUrl() != null && !activity.getImageUrl().isEmpty()) {
+                activityData.put("imageUrl", activity.getImageUrl());
+                Log.d(TAG, "🖼️ Including local image URL in direct creation");
+            } else {
+                activityData.put("imageUrl", "");
+                Log.d(TAG, "📝 No image URL for direct creation");
+            }
+            
+            // Get or create trip Firebase ID
+            String tripFirebaseId = trip.getFirebaseId();
+            if (tripFirebaseId == null || tripFirebaseId.isEmpty()) {
+                Log.d(TAG, "Trip has no Firebase ID, creating trip in Firebase first");
+                saveTripToFirebaseFirst(trip, userEmail, activityData, listener);
+                return;
+            }
+            
+            // Save activity directly to Firebase
+            Log.d(TAG, "Saving activity to Firebase trip: " + tripFirebaseId);
+            saveActivityToFirebase(userEmail, tripFirebaseId, activityData, listener);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error preparing activity for Firebase save", e);
+            listener.onError("Failed to prepare activity data: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Save trip to Firebase first, then save activity
+     */
+    private void saveTripToFirebaseFirst(Trip trip, String userEmail, Map<String, Object> activityData, OnActivitySaveListener listener) {
+        Map<String, Object> tripData = createTripFirebaseData(trip);
+        
+        firestore.collection(COLLECTION_USERS)
+                .document(userEmail)
+                .collection(COLLECTION_TRIPS)
+                .add(tripData)
+                .addOnSuccessListener(documentReference -> {
+                    String tripFirebaseId = documentReference.getId();
+                    Log.d(TAG, "✅ Trip created in Firebase with ID: " + tripFirebaseId);
+                    
+                    // Update local trip with Firebase ID
+                    TripRepository repository = TripRepository.getInstance(context);
+                    repository.updateTripFirebaseId(trip.getId(), tripFirebaseId);
+                    
+                    // Now save the activity
+                    saveActivityToFirebase(userEmail, tripFirebaseId, activityData, listener);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "❌ Failed to create trip in Firebase", e);
+                    listener.onError("Failed to create trip in Firebase: " + e.getMessage());
+                });
+    }
+    
+    /**
+     * Save activity data to Firebase
+     */
+    private void saveActivityToFirebase(String userEmail, String tripFirebaseId, Map<String, Object> activityData, OnActivitySaveListener listener) {
+        // Check for duplicates first to prevent multiple saves
+        String title = (String) activityData.get("title");
+        Long dateTime = (Long) activityData.get("dateTime");
+        
+        firestore.collection(COLLECTION_USERS)
+                .document(userEmail)
+                .collection(COLLECTION_TRIPS)
+                .document(tripFirebaseId)
+                .collection(COLLECTION_ACTIVITIES)
+                .whereEqualTo("title", title)
+                .whereEqualTo("dateTime", dateTime)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (!querySnapshot.isEmpty()) {
+                        // Activity already exists, update it
+                        String existingId = querySnapshot.getDocuments().get(0).getId();
+                        Log.d(TAG, "🔄 Activity already exists, updating: " + title);
+                        updateActivityInFirebase(userEmail, tripFirebaseId, existingId, activityData, listener);
+                    } else {
+                        // Create new activity
+                        Log.d(TAG, "➕ Creating new activity in Firebase: " + title);
+                        createActivityInFirebase(userEmail, tripFirebaseId, activityData, listener);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "⚠️ Error checking for duplicates, creating new activity: " + title, e);
+                    createActivityInFirebase(userEmail, tripFirebaseId, activityData, listener);
+                });
+    }
+    
+    /**
+     * Create new activity in Firebase
+     */
+    private void createActivityInFirebase(String userEmail, String tripFirebaseId, Map<String, Object> activityData, OnActivitySaveListener listener) {
+        firestore.collection(COLLECTION_USERS)
+                .document(userEmail)
+                .collection(COLLECTION_TRIPS)
+                .document(tripFirebaseId)
+                .collection(COLLECTION_ACTIVITIES)
+                .add(activityData)
+                .addOnSuccessListener(documentReference -> {
+                    String firebaseId = documentReference.getId();
+                    Log.d(TAG, "✅ Activity created in Firebase with ID: " + firebaseId);
+                    listener.onSuccess(firebaseId);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "❌ Failed to create activity in Firebase", e);
+                    listener.onError("Failed to save activity: " + e.getMessage());
+                });
+    }
+    
+    /**
+     * Update existing activity in Firebase
+     */
+    private void updateActivityInFirebase(String userEmail, String tripFirebaseId, String documentId, Map<String, Object> activityData, OnActivitySaveListener listener) {
+        firestore.collection(COLLECTION_USERS)
+                .document(userEmail)
+                .collection(COLLECTION_TRIPS)
+                .document(tripFirebaseId)
+                .collection(COLLECTION_ACTIVITIES)
+                .document(documentId)
+                .set(activityData)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "✅ Activity updated in Firebase: " + activityData.get("title"));
+                    listener.onSuccess(documentId);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "❌ Failed to update activity in Firebase", e);
+                    listener.onError("Failed to update activity: " + e.getMessage());
+                });
     }
 } 

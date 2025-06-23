@@ -822,7 +822,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             
             // Set custom message
             if (messageView != null) {
-                messageView.setText("Expense Added Successfully!");
+                messageView.setText(getString(R.string.expense_added_successfully));
             }
             
             // Auto dismiss after animation completes
@@ -847,6 +847,54 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
         }
     }
 
+    private void showEditSuccessAnimationSafe() {
+        Context context = getContext();
+        if (context == null) return;
+        
+        try {
+            // Create the success animation dialog
+            AlertDialog.Builder builder = new AlertDialog.Builder(context);
+            View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_success_animation, null);
+            builder.setView(dialogView);
+            
+            AlertDialog dialog = builder.create();
+            dialog.setCancelable(true);
+            // Remove the transparent background so our dark overlay shows
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+            
+            // Find views in the dialog
+            com.airbnb.lottie.LottieAnimationView animationView = dialogView.findViewById(R.id.animation_success);
+            TextView messageView = dialogView.findViewById(R.id.tv_success_message);
+            
+            // Set custom message for edit success
+            if (messageView != null) {
+                messageView.setText(getString(R.string.expense_updated_successfully));
+            }
+            
+            // Auto dismiss after animation completes
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    if (dialog != null && dialog.isShowing()) {
+                        dialog.dismiss();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error dismissing edit animation dialog", e);
+                }
+            }, 2500); // 2.5 seconds
+            
+            dialog.show();
+            playSuccessSound();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing edit success animation", e);
+            // Fallback to simple toast
+            Toast.makeText(context, "✅ " + getString(R.string.expense_updated_successfully), Toast.LENGTH_SHORT).show();
+            playSuccessSound();
+        }
+    }
+
     private void playSuccessSound() {
         try {
             Context context = getContext();
@@ -855,10 +903,25 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             if (successSound != null) {
                 successSound.release();
             }
-            // Use default notification sound
-            successSound = MediaPlayer.create(context, android.provider.Settings.System.DEFAULT_NOTIFICATION_URI);
+            
+            // Try to use custom success sound first
+            successSound = MediaPlayer.create(context, R.raw.success_sound);
             if (successSound != null) {
+                successSound.setOnCompletionListener(mediaPlayer -> {
+                    try {
+                        mediaPlayer.release();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error releasing MediaPlayer", e);
+                    }
+                });
                 successSound.start();
+            } else {
+                Log.w(TAG, "Custom success sound not available, using default notification sound");
+                // Fallback to default notification sound
+                successSound = MediaPlayer.create(context, android.provider.Settings.System.DEFAULT_NOTIFICATION_URI);
+                if (successSound != null) {
+                    successSound.start();
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error playing success sound", e);
@@ -1048,8 +1111,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                         updateBudgetDisplay();
                         updateChartData();
                         
-                        showSuccessAnimationSafe();
-                        showErrorToast("Expense updated successfully!");
+                        showEditSuccessAnimationSafe();
                     }
                 } catch (NumberFormatException e) {
                     showErrorToast("Please enter a valid amount");

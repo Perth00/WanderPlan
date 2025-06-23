@@ -456,12 +456,15 @@ public class LoginActivity extends AppCompatActivity {
     }
     
     private void showCloudDataLoadedDialog(int tripsLoaded, int activitiesLoaded) {
+        // Build message without showing "Activities: 0" when there are no activities
+        String activitiesText = activitiesLoaded > 0 ? "\n📝 Activities: " + activitiesLoaded : "";
+        
         new android.app.AlertDialog.Builder(this)
                 .setTitle("✅ Cloud Data Loaded")
                 .setMessage("🎉 Successfully loaded your data from the cloud!\n\n" +
                            "📊 Data restored from Firebase JSON:\n" +
-                           "🧳 Trips: " + tripsLoaded + "\n" +
-                           "📝 Activities: " + activitiesLoaded + "\n\n" +
+                           "🧳 Trips: " + tripsLoaded + 
+                           activitiesText + "\n\n" +
                            "Your local database has been updated with your cloud data.")
                 .setPositiveButton("Continue", (dialog, which) -> {
                     navigateToMainActivity();
@@ -620,12 +623,15 @@ public class LoginActivity extends AppCompatActivity {
     }
     
     private void showSyncSuccessDialog(int tripsSynced, int activitiesSynced) {
+        // Build message without showing "Activities: 0" when there are no activities
+        String activitiesText = activitiesSynced > 0 ? "\n📝 Activities: " + activitiesSynced : "";
+        
         new android.app.AlertDialog.Builder(this)
                 .setTitle("✅ Backup Complete")
                 .setMessage("🎉 Success!\n\n" +
                            "📊 Data backed up to Firebase:\n" +
-                           "🧳 Trips: " + tripsSynced + "\n" +
-                           "📝 Activities: " + activitiesSynced + "\n" +
+                           "🧳 Trips: " + tripsSynced + 
+                           activitiesText + "\n" +
                            "🖼️ Images: Uploaded to Firebase Storage\n\n" +
                            "✅ Your local data is still safe on this device\n" +
                            "☁️ Cloud backup created for access anywhere!")
