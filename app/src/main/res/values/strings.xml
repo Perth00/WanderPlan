@@ -94,6 +94,7 @@
     <string name="theme">Theme</string>
     <string name="notifications">Notifications</string>
     <string name="about">About</string>
+    <string name="data_sync">Data Sync</string>
     <string name="feedback">Send Feedback</string>
     <string name="version">Version</string>
     

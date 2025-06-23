@@ -383,6 +383,20 @@ public class TripRepository {
         syncTripToFirebase(trip, listener);
     }
     
+    /**
+     * Update trip Firebase ID in database
+     */
+    public void updateTripFirebaseId(int tripId, String firebaseId) {
+        executor.execute(() -> {
+            try {
+                tripDao.updateTripFirebaseId(tripId, firebaseId);
+                Log.d(TAG, "Updated Firebase ID for trip " + tripId + ": " + firebaseId);
+            } catch (Exception e) {
+                Log.e(TAG, "Error updating trip Firebase ID", e);
+            }
+        });
+    }
+    
     // Public method to manually trigger duplicate cleanup
     public void forceCleanupDuplicateTrips(OnTripSyncListener listener) {
         executor.execute(() -> {
@@ -669,12 +683,13 @@ public class TripRepository {
     
     private void deleteImageFromFirebaseStorage(String imageUrl) {
         try {
+            Log.d(TAG, "🖼️ Deleting image from Firebase Storage (async): " + imageUrl);
             com.google.firebase.storage.StorageReference imageRef = storage.getReferenceFromUrl(imageUrl);
             imageRef.delete()
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Image deleted from Firebase Storage"))
-                .addOnFailureListener(e -> Log.w(TAG, "Failed to delete image from Firebase Storage", e));
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Image deleted from Firebase Storage (async)"))
+                .addOnFailureListener(e -> Log.w(TAG, "⚠️ Failed to delete image from Firebase Storage (async)", e));
         } catch (Exception e) {
-            Log.w(TAG, "Error deleting image from Firebase Storage", e);
+            Log.w(TAG, "Error deleting image from Firebase Storage (async)", e);
         }
     }
     
@@ -1057,151 +1072,65 @@ public class TripRepository {
     public void deleteActivity(TripActivity activity, OnActivityOperationListener listener) {
         executor.execute(() -> {
             try {
-                Log.d(TAG, "=== STARTING ACTIVITY DELETION ===");
-                Log.d(TAG, "Activity: " + activity.getTitle() + " (Local ID: " + activity.getId() + ", Firebase ID: " + activity.getFirebaseId() + ")");
+                Log.d(TAG, "Starting activity deletion: " + activity.getTitle() + " (ID: " + activity.getId() + ")");
                 
-                // CRITICAL FIX: Simplified synchronization to prevent concurrent deletions but allow rapid sequential deletions
-                synchronized (this) {
-                    // Step 0: Check if this activity is already being deleted (shorter check)
-                    if (activity.getFirebaseId() != null && !activity.getFirebaseId().isEmpty()) {
-                        synchronized (activitiesBeingDeleted) {
-                            if (activitiesBeingDeleted.contains(activity.getFirebaseId())) {
-                                Log.w(TAG, "Activity is already being deleted: " + activity.getFirebaseId());
-                                if (listener != null) {
-                                    listener.onSuccess(activity.getId());
-                                }
-                                return;
-                            }
-                        }
+                // Quick check if activity exists and delete immediately for responsive UI
+                TripActivity existingActivity = null;
+                try {
+                    existingActivity = activityDao.getActivityByIdSync(activity.getId());
+                } catch (Exception e) {
+                    Log.e(TAG, "Error checking activity existence", e);
+                }
+                
+                if (existingActivity == null) {
+                    Log.w(TAG, "Activity no longer exists, deletion already completed");
+                    if (listener != null) {
+                        listener.onSuccess(activity.getId());
                     }
-                    
-                    // Step 1: Check if activity still exists in database (prevent double deletion)
-                    TripActivity existingActivity = null;
-                    try {
-                        List<TripActivity> allActivities = activityDao.getActivitiesForTripSync(activity.getTripId());
-                        for (TripActivity act : allActivities) {
-                            if (act.getId() == activity.getId()) {
-                                existingActivity = act;
-                                break;
-                            }
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error checking if activity exists", e);
-                    }
-                    
-                    if (existingActivity == null) {
-                        Log.w(TAG, "Activity no longer exists in database, deletion already completed");
+                    return;
+                }
+                
+                // Check for rapid duplicate deletion attempts
+                String activityKey = "activity_" + activity.getId();
+                synchronized (activitiesBeingDeleted) {
+                    if (activitiesBeingDeleted.contains(activityKey)) {
+                        Log.w(TAG, "Activity is already being deleted: " + activity.getTitle());
                         if (listener != null) {
                             listener.onSuccess(activity.getId());
                         }
                         return;
                     }
-                    
-                    // Step 2: Mark activity as being deleted briefly (shortened duration)
-                    if (existingActivity.getFirebaseId() != null && !existingActivity.getFirebaseId().isEmpty()) {
-                        synchronized (activitiesBeingDeleted) {
-                            activitiesBeingDeleted.add(existingActivity.getFirebaseId());
-                            deletionTimestamps.put(existingActivity.getFirebaseId(), System.currentTimeMillis());
-                            Log.d(TAG, "✓ Marked activity as being deleted: " + existingActivity.getFirebaseId());
-                        }
-                    }
-                    
-                    // Step 3: ALWAYS delete from local database first for immediate UI feedback
+                    activitiesBeingDeleted.add(activityKey);
+                }
+                
+                try {
+                    // Delete from local database immediately for responsive UI
                     activityDao.deleteActivity(existingActivity);
-                    Log.d(TAG, "✓ Activity deleted from local database successfully");
+                    Log.d(TAG, "✅ Activity deleted from local database: " + activity.getTitle());
                     
-                    // Step 4: Handle Firebase deletion for logged-in users (SHORTENED TIMEOUT)
-                    if (!userManager.isLoggedIn()) {
-                        Log.d(TAG, "Guest user - local deletion complete");
-                        // Clean up deletion tracking
-                        if (existingActivity.getFirebaseId() != null) {
-                            synchronized (activitiesBeingDeleted) {
-                                activitiesBeingDeleted.remove(existingActivity.getFirebaseId());
-                                deletionTimestamps.remove(existingActivity.getFirebaseId());
-                            }
-                        }
-                        if (listener != null) {
-                            listener.onSuccess(existingActivity.getId());
-                        }
-                        return;
+                    // Always report success immediately since local deletion worked
+                    if (listener != null) {
+                        listener.onSuccess(existingActivity.getId());
                     }
                     
-                    // Step 5: Check if Firebase deletion is needed
-                    boolean hasFirebaseId = existingActivity.getFirebaseId() != null && !existingActivity.getFirebaseId().isEmpty();
-                    boolean hasFirebaseImage = existingActivity.getImageUrl() != null && 
-                        existingActivity.getImageUrl().startsWith("https://firebasestorage.googleapis.com");
-                    
-                    if (!hasFirebaseId && !hasFirebaseImage) {
-                        Log.d(TAG, "No Firebase resources to delete - local deletion sufficient");
-                        if (listener != null) {
-                            listener.onSuccess(existingActivity.getId());
-                        }
-                        return;
+                    // Handle Firebase deletion in background (don't wait for it)
+                    if (userManager.isLoggedIn() && existingActivity.getFirebaseId() != null && !existingActivity.getFirebaseId().isEmpty()) {
+                        deleteFromFirebaseBackground(existingActivity);
                     }
                     
-                    // Step 6: Get trip information for Firebase deletion
-                    Trip trip = tripDao.getTripByIdSync(existingActivity.getTripId());
-                    if (trip == null || trip.getFirebaseId() == null || trip.getFirebaseId().isEmpty()) {
-                        Log.w(TAG, "Trip not found or has no Firebase ID - local deletion only");
-                        // Clean up deletion tracking
-                        if (existingActivity.getFirebaseId() != null) {
-                            synchronized (activitiesBeingDeleted) {
-                                activitiesBeingDeleted.remove(existingActivity.getFirebaseId());
-                                deletionTimestamps.remove(existingActivity.getFirebaseId());
-                            }
-                        }
-                        if (listener != null) {
-                            listener.onSuccess(existingActivity.getId());
-                        }
-                        return;
+                } finally {
+                    // Always clean up the deletion flag
+                    synchronized (activitiesBeingDeleted) {
+                        activitiesBeingDeleted.remove(activityKey);
                     }
-                    
-                    Log.d(TAG, "Starting Firebase deletion for trip: " + trip.getTitle());
-                    
-                    // Step 7: Delete from Firebase with MUCH SHORTER timeout (2 seconds instead of 15)
-                    final TripActivity finalActivity = existingActivity; // Make it effectively final for inner classes
-                    deleteActivityFromFirebaseWithTimeout(existingActivity, trip, new OnActivityOperationListener() {
-                        @Override
-                        public void onSuccess(int activityId) {
-                            // Clean up deletion tracking on success
-                            if (finalActivity.getFirebaseId() != null) {
-                                synchronized (activitiesBeingDeleted) {
-                                    activitiesBeingDeleted.remove(finalActivity.getFirebaseId());
-                                    deletionTimestamps.remove(finalActivity.getFirebaseId());
-                                    Log.d(TAG, "✓ Removed activity from deletion tracking: " + finalActivity.getFirebaseId());
-                                }
-                            }
-                            if (listener != null) {
-                                listener.onSuccess(activityId);
-                            }
-                        }
-                        
-                        @Override
-                        public void onError(String error) {
-                            // Clean up deletion tracking on error too (local deletion already succeeded)
-                            if (finalActivity.getFirebaseId() != null) {
-                                synchronized (activitiesBeingDeleted) {
-                                    activitiesBeingDeleted.remove(finalActivity.getFirebaseId());
-                                    deletionTimestamps.remove(finalActivity.getFirebaseId());
-                                    Log.d(TAG, "✓ Removed activity from deletion tracking (error): " + finalActivity.getFirebaseId());
-                                }
-                            }
-                            // Still consider this successful since local deletion worked
-                            if (listener != null) {
-                                listener.onSuccess(finalActivity.getId());
-                            }
-                        }
-                    }, 2000); // FIXED: 2 second timeout instead of 15 seconds for rapid deletions
                 }
                 
             } catch (Exception e) {
-                Log.e(TAG, "=== ERROR IN ACTIVITY DELETION ===", e);
+                Log.e(TAG, "Error in activity deletion", e);
                 // Clean up deletion tracking on exception
-                if (activity.getFirebaseId() != null) {
-                    synchronized (activitiesBeingDeleted) {
-                        activitiesBeingDeleted.remove(activity.getFirebaseId());
-                        deletionTimestamps.remove(activity.getFirebaseId());
-                    }
+                String activityKey = "activity_" + activity.getId();
+                synchronized (activitiesBeingDeleted) {
+                    activitiesBeingDeleted.remove(activityKey);
                 }
                 if (listener != null) {
                     listener.onError("Failed to delete activity: " + e.getMessage());
@@ -1210,16 +1139,56 @@ public class TripRepository {
         });
     }
     
+    private void deleteFromFirebaseBackground(TripActivity activity) {
+        // Background Firebase deletion - doesn't affect UI responsiveness
+        try {
+            Trip trip = tripDao.getTripByIdSync(activity.getTripId());
+            if (trip == null || trip.getFirebaseId() == null) {
+                Log.d(TAG, "No Firebase trip found, skipping Firebase deletion");
+                return;
+            }
+            
+            Log.d(TAG, "Deleting from Firebase in background: " + activity.getTitle());
+            deleteActivityFromFirebase(activity, trip, new OnActivityOperationListener() {
+                @Override
+                public void onSuccess(int activityId) {
+                    Log.d(TAG, "✅ Background Firebase deletion successful: " + activity.getTitle());
+                }
+                
+                @Override
+                public void onError(String error) {
+                    Log.w(TAG, "⚠️ Background Firebase deletion failed (local deletion was successful): " + error);
+                }
+            });
+        } catch (Exception e) {
+            Log.w(TAG, "Error in background Firebase deletion: " + e.getMessage());
+        }
+    }
+    
     private void deleteActivityFromFirebase(TripActivity activity, Trip trip, OnActivityOperationListener listener) {
         Log.d(TAG, "Deleting Firebase resources for activity: " + activity.getTitle());
         
         String userEmail = userManager.getUserEmail();
         
-        // Delete image from Firebase Storage if exists
-        if (activity.getImageUrl() != null && activity.getImageUrl().startsWith("https://firebasestorage.googleapis.com")) {
-            deleteImageFromFirebaseStorage(activity.getImageUrl());
-        }
+        // Check if we need to delete an image first
+        boolean hasFirebaseImage = activity.getImageUrl() != null && 
+                                 activity.getImageUrl().startsWith("https://firebasestorage.googleapis.com");
         
+        if (hasFirebaseImage) {
+            Log.d(TAG, "Deleting image first, then Firestore document for: " + activity.getTitle());
+            // Delete image first, then delete Firestore document
+            deleteImageFromFirebaseStorageSync(activity.getImageUrl(), () -> {
+                // After image deletion completes (or fails), delete the Firestore document
+                deleteFirestoreDocument(activity, trip, userEmail, listener);
+            });
+        } else {
+            Log.d(TAG, "No Firebase image to delete, deleting Firestore document directly for: " + activity.getTitle());
+            // No image to delete, proceed directly to Firestore document deletion
+            deleteFirestoreDocument(activity, trip, userEmail, listener);
+        }
+    }
+    
+    private void deleteFirestoreDocument(TripActivity activity, Trip trip, String userEmail, OnActivityOperationListener listener) {
         // Delete activity document from Firestore
         if (activity.getFirebaseId() != null && !activity.getFirebaseId().isEmpty()) {
             firestore.collection("users")
@@ -1230,13 +1199,13 @@ public class TripRepository {
                 .document(activity.getFirebaseId())
                 .delete()
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "✓ Firebase activity document deleted successfully");
+                    Log.d(TAG, "✅ Firebase activity document deleted successfully: " + activity.getTitle());
                     if (listener != null) {
                         listener.onSuccess(activity.getId());
                     }
                 })
                 .addOnFailureListener(e -> {
-                    Log.w(TAG, "⚠ Firebase activity deletion failed: " + e.getMessage());
+                    Log.w(TAG, "⚠️ Firebase activity deletion failed: " + e.getMessage());
                     // Local deletion already succeeded, so consider this successful
                     if (listener != null) {
                         listener.onSuccess(activity.getId());
@@ -1247,6 +1216,27 @@ public class TripRepository {
             if (listener != null) {
                 listener.onSuccess(activity.getId());
             }
+        }
+    }
+    
+    private void deleteImageFromFirebaseStorageSync(String imageUrl, Runnable onComplete) {
+        try {
+            Log.d(TAG, "🖼️ Deleting image from Firebase Storage: " + imageUrl);
+            com.google.firebase.storage.StorageReference imageRef = storage.getReferenceFromUrl(imageUrl);
+            imageRef.delete()
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "✅ Image deleted from Firebase Storage successfully");
+                    onComplete.run();
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "⚠️ Failed to delete image from Firebase Storage: " + e.getMessage());
+                    // Continue even if image deletion fails
+                    onComplete.run();
+                });
+        } catch (Exception e) {
+            Log.w(TAG, "Error deleting image from Firebase Storage", e);
+            // Continue even if there's an exception
+            onComplete.run();
         }
     }
     
@@ -1583,20 +1573,17 @@ public class TripRepository {
                         Long existingDateTime = doc.getLong("dateTime");
                         if (existingDateTime != null && 
                             Math.abs(existingDateTime - activity.getDateTime()) < 300000) { // 5 minutes
-                            Log.w(TAG, "Duplicate activity found in Firebase, skipping sync");
+                            Log.w(TAG, "🔄 Duplicate activity found in Firebase, updating instead of creating new: " + activity.getTitle());
                             duplicateFound = true;
-                            // Update local activity with Firebase ID to prevent future sync attempts
-                            activity.setFirebaseId(doc.getId());
-                            activityDao.updateActivityFirebaseId(activity.getId(), doc.getId());
-                            if (listener != null) {
-                                listener.onSuccess(activity.getId());
-                            }
+                            
+                            // Update the existing Firebase document instead of creating a new one
+                            updateExistingFirebaseActivity(doc.getId(), activity, trip, listener);
                             break;
                         }
                     }
                     
                     if (!duplicateFound) {
-                        // Proceed with normal sync
+                        // Proceed with normal sync (create new)
                         performFirebaseSync(activity, trip, listener);
                     }
                 })
@@ -1608,6 +1595,56 @@ public class TripRepository {
         });
     }
     
+    /**
+     * Update existing Firebase activity document instead of creating duplicate
+     */
+    private void updateExistingFirebaseActivity(String existingFirebaseId, TripActivity activity, Trip trip, OnActivityOperationListener listener) {
+        Log.d(TAG, "📝 Updating existing Firebase activity: " + activity.getTitle() + " (Firebase ID: " + existingFirebaseId + ")");
+        
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("description", activity.getDescription());
+        updateData.put("location", activity.getLocation());
+        updateData.put("timeString", activity.getTimeString());
+        updateData.put("updatedAt", activity.getUpdatedAt());
+        
+        // Only update image URL if the local activity has an image URL and it's different
+        if (activity.getImageUrl() != null && !activity.getImageUrl().isEmpty()) {
+            updateData.put("imageUrl", activity.getImageUrl());
+            Log.d(TAG, "🖼️ Updating image URL in existing Firebase activity");
+        }
+        
+        String userEmail = userManager.getUserEmail();
+        
+        firestore.collection("users")
+            .document(userEmail)
+            .collection("trips")
+            .document(trip.getFirebaseId())
+            .collection("activities")
+            .document(existingFirebaseId)
+            .update(updateData)
+            .addOnSuccessListener(aVoid -> {
+                Log.d(TAG, "✅ Successfully updated existing Firebase activity: " + activity.getTitle());
+                
+                // Update local activity with Firebase ID if it doesn't have one
+                if (activity.getFirebaseId() == null || activity.getFirebaseId().isEmpty()) {
+                    activity.setFirebaseId(existingFirebaseId);
+                    activityDao.updateActivityFirebaseId(activity.getId(), existingFirebaseId);
+                    Log.d(TAG, "🔗 Updated local activity with Firebase ID: " + existingFirebaseId);
+                }
+                
+                activityDao.markActivityAsSynced(activity.getId());
+                if (listener != null) {
+                    listener.onSuccess(activity.getId());
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "❌ Error updating existing Firebase activity: " + activity.getTitle(), e);
+                if (listener != null) {
+                    listener.onError("Failed to update existing activity: " + e.getMessage());
+                }
+            });
+    }
+
     private void performFirebaseSync(TripActivity activity, Trip trip, OnActivityOperationListener listener) {
         Map<String, Object> activityData = new HashMap<>();
         activityData.put("title", activity.getTitle());

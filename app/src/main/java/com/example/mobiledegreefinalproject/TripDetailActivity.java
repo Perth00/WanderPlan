@@ -51,6 +51,7 @@ public class TripDetailActivity extends AppCompatActivity {
     
     // CRITICAL FIX: Add flag to prevent finishing during operations
     private boolean isDeletingActivity = false;
+    private final java.util.Set<Integer> currentlyDeletingActivities = new java.util.HashSet<>();
     
     // Info Panel Manager for non-intrusive messages
     private InfoPanelManager infoPanelManager;
@@ -488,261 +489,93 @@ public class TripDetailActivity extends AppCompatActivity {
     }
 
     private void deleteActivity(TripActivity activity) {
-        // CRITICAL FIX: Check activity state first
+        // Simple state check
         if (isFinishing() || isDestroyed()) {
             Log.w(TAG, "Activity is finishing/destroyed, skipping deletion");
             return;
         }
         
-        Log.d(TAG, "Starting activity deletion for: " + activity.getTitle() + " (ID: " + activity.getId() + ", Firebase ID: " + activity.getFirebaseId() + ")");
-        
-        // CRITICAL FIX: If activity doesn't have Firebase ID, get fresh data from repository directly (not LiveData)
-        if (activity.getFirebaseId() == null || activity.getFirebaseId().isEmpty()) {
-            Log.w(TAG, "Activity missing Firebase ID, attempting to get fresh data from database");
-            
-            // Use executor to avoid LiveData observer leaks
-            com.example.mobiledegreefinalproject.repository.TripRepository repository = 
-                com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
-            
-            // Get fresh data from repository without LiveData
-            new Thread(() -> {
-                try {
-                    List<TripActivity> activities = repository.getActivitiesForTripSync(tripId);
-                    TripActivity updatedActivity = null;
-                    
-                    for (TripActivity act : activities) {
-                        if (act.getTitle().equals(activity.getTitle()) && 
-                            Math.abs(act.getDateTime() - activity.getDateTime()) < 60000) { // Within 1 minute
-                            updatedActivity = act;
-                            break;
-                        }
-                    }
-                    
-                    final TripActivity finalActivity = (updatedActivity != null && updatedActivity.getFirebaseId() != null) 
-                        ? updatedActivity : activity;
-                    
-                    // Switch back to UI thread for deletion
-                    runOnUiThread(() -> {
-                        if (!isFinishing() && !isDestroyed()) {
-                            if (finalActivity.getFirebaseId() != null && !finalActivity.getFirebaseId().equals(activity.getFirebaseId())) {
-                                Log.d(TAG, "Found updated activity with Firebase ID: " + finalActivity.getFirebaseId());
-                            } else {
-                                Log.w(TAG, "Could not find activity with Firebase ID, proceeding with original");
-                            }
-                            proceedWithDeletion(finalActivity);
-                        }
-                    });
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error getting fresh activity data", e);
-                    runOnUiThread(() -> {
-                        if (!isFinishing() && !isDestroyed()) {
-                            proceedWithDeletion(activity);
-                        }
-                    });
-                }
-            }).start();
-        } else {
-            proceedWithDeletion(activity);
-        }
-    }
-    
-    private void proceedWithDeletion(TripActivity activity) {
-        // CRITICAL FIX: Check activity state before proceeding
-        if (isFinishing() || isDestroyed()) {
-            Log.w(TAG, "Activity is finishing/destroyed, aborting deletion");
-            return;
+        // Check if this specific activity is already being deleted
+        synchronized (currentlyDeletingActivities) {
+            if (currentlyDeletingActivities.contains(activity.getId())) {
+                Log.w(TAG, "Activity " + activity.getId() + " is already being deleted, ignoring duplicate request");
+                return;
+            }
+            // Mark this activity as being deleted
+            currentlyDeletingActivities.add(activity.getId());
         }
         
-        // CRITICAL FIX: Set deletion flag to prevent unexpected finishing
-        isDeletingActivity = true;
+        Log.d(TAG, "Starting activity deletion for: " + activity.getTitle() + " (ID: " + activity.getId() + ")");
         
-        Log.d(TAG, "Proceeding with deletion for: " + activity.getTitle() + " (Firebase ID: " + activity.getFirebaseId() + ")");
-        
-        // Show loading dialog using modern AlertDialog
+        // Show progress immediately
         android.app.AlertDialog progressDialog = new android.app.AlertDialog.Builder(this)
             .setMessage("Deleting activity...")
             .setCancelable(false)
             .create();
+        progressDialog.show();
         
-        // CRITICAL FIX: Only show dialog if activity is still alive
-        if (!isFinishing() && !isDestroyed()) {
-            try {
-                progressDialog.show();
-            } catch (Exception e) {
-                Log.w(TAG, "Error showing progress dialog", e);
-                // Continue without dialog if there's an issue
-            }
-        } else {
-            Log.w(TAG, "Activity destroyed, skipping dialog and deletion");
-            isDeletingActivity = false;
-            return;
-        }
+        // Use repository directly for immediate deletion
+        com.example.mobiledegreefinalproject.repository.TripRepository repository = 
+            com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
         
-        try {
-            // CRITICAL FIX: Use repository directly instead of ViewModel to avoid LiveData observer leaks
-            com.example.mobiledegreefinalproject.repository.TripRepository repository = 
-                com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
-            
-            repository.deleteActivity(activity, new com.example.mobiledegreefinalproject.repository.TripRepository.OnActivityOperationListener() {
-                @Override
-                public void onSuccess(int activityId) {
-                    Log.d(TAG, "Activity deletion successful: " + activityId);
-                    
-                    // CRITICAL FIX: Clear deletion flag
-                    isDeletingActivity = false;
-                    
-                    // CRITICAL FIX: Check activity state before UI operations
-                    if (!isFinishing() && !isDestroyed()) {
-                        try {
-                            if (progressDialog != null && progressDialog.isShowing()) {
-                                progressDialog.dismiss();
-                            }
-                        } catch (Exception e) {
-                            Log.w(TAG, "Error dismissing progress dialog", e);
-                        }
-                        
-                        // CRITICAL FIX: Show success message safely
-                        try {
-                            if (infoPanelManager != null) {
-                                infoPanelManager.addCustomMessage("Activity deleted successfully! Refreshing timeline...", false);
-                            }
-                        } catch (Exception e) {
-                            Log.w(TAG, "Error showing success toast", e);
-                        }
-                        
-                        // CRITICAL FIX: Immediate UI refresh without using LiveData observers to prevent crashes
-                        // Use a small delay to ensure the deletion has been processed
-                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                            if (!isFinishing() && !isDestroyed()) {
-                                refreshActivityDataDirectly();
-                            }
-                        }, 300);
-                        
-                        // Also force a sync to ensure data consistency after a longer delay
-                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                            if (!isFinishing() && !isDestroyed()) {
-                                forceSyncActivitiesQuiet();
-                            }
-                        }, 1000);
-                        
-                    } else {
-                        Log.w(TAG, "Activity destroyed during success callback");
-                        // Still try to dismiss dialog safely
-                        try {
-                            if (progressDialog != null && progressDialog.isShowing()) {
-                                progressDialog.dismiss();
-                            }
-                        } catch (Exception ignored) {}
-                    }
+        repository.deleteActivity(activity, new com.example.mobiledegreefinalproject.repository.TripRepository.OnActivityOperationListener() {
+            @Override
+            public void onSuccess(int activityId) {
+                Log.d(TAG, "Activity deletion successful: " + activityId);
+                
+                // Remove from deletion tracking
+                synchronized (currentlyDeletingActivities) {
+                    currentlyDeletingActivities.remove(activity.getId());
                 }
                 
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "Activity deletion failed: " + error);
-                    
-                    // CRITICAL FIX: Clear deletion flag
-                    isDeletingActivity = false;
-                    
-                    // CRITICAL FIX: Check activity state before UI operations
-                    if (!isFinishing() && !isDestroyed()) {
-                        try {
-                            if (progressDialog != null && progressDialog.isShowing()) {
-                                progressDialog.dismiss();
-                            }
-                        } catch (Exception e) {
-                            Log.w(TAG, "Error dismissing progress dialog", e);
-                        }
-                        
-                        // Show user-friendly error message
-                        String userMessage = "Failed to delete activity";
-                        if (error.contains("network") || error.contains("timeout")) {
-                            userMessage = "Network error - activity may have been deleted locally";
-                        } else if (error.contains("not found") || error.contains("doesn't exist")) {
-                            userMessage = "Activity was already deleted";
-                        }
-                        
-                        try {
-                            new android.app.AlertDialog.Builder(TripDetailActivity.this)
-                                    .setTitle("Delete Result")
-                                    .setMessage(userMessage + "\n\nRefreshing trip data...")
-                                    .setPositiveButton("OK", (dialog, which) -> {
-                                        // Force refresh after error
-                                        if (!isFinishing() && !isDestroyed()) {
-                                            refreshActivityDataDirectly();
-                                        }
-                                    })
-                                    .show();
-                        } catch (Exception e) {
-                            Log.w(TAG, "Error showing error dialog", e);
-                            // Fallback to toast
-                            try {
-                                if (infoPanelManager != null) {
-                                    infoPanelManager.addCustomMessage(userMessage, true);
-                                }
-                            } catch (Exception toastError) {
-                                Log.w(TAG, "Error showing error toast", toastError);
-                            }
-                        }
-                        
-                        // CRITICAL FIX: Refresh data even on error to show current state without using LiveData observers
-                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                            if (!isFinishing() && !isDestroyed()) {
-                                refreshActivityDataDirectly();
-                                
-                                // Force sync to ensure we have correct state
-                                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                                    if (!isFinishing() && !isDestroyed()) {
-                                        forceSyncActivitiesQuiet();
-                                    }
-                                }, 1000);
-                            }
-                        }, 300);
-                        
-                    } else {
-                        Log.w(TAG, "Activity destroyed during error callback");
-                        // Still try to dismiss dialog safely
-                        try {
-                            if (progressDialog != null && progressDialog.isShowing()) {
-                                progressDialog.dismiss();
-                            }
-                        } catch (Exception ignored) {}
-                    }
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Exception during activity deletion", e);
-            
-            // CRITICAL FIX: Clear deletion flag on exception
-            isDeletingActivity = false;
-            
-            // CRITICAL FIX: Safe cleanup on exception
-            if (!isFinishing() && !isDestroyed()) {
+                // Dismiss dialog safely
                 try {
-                    if (progressDialog != null && progressDialog.isShowing()) {
+                    if (progressDialog.isShowing()) {
                         progressDialog.dismiss();
                     }
-                } catch (Exception dialogError) {
-                    Log.w(TAG, "Error dismissing progress dialog on exception", dialogError);
+                } catch (Exception e) {
+                    Log.w(TAG, "Error dismissing progress dialog", e);
                 }
                 
-                try {
-                    if (infoPanelManager != null) {
-                        infoPanelManager.addCustomMessage("Error deleting activity, refreshing data...", true);
-                    }
-                } catch (Exception toastError) {
-                    Log.w(TAG, "Error showing exception toast", toastError);
+                // Show brief success message
+                if (infoPanelManager != null) {
+                    infoPanelManager.addCustomMessage("Activity deleted", false);
                 }
                 
-                // Force refresh to show current state
-                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                    if (!isFinishing() && !isDestroyed()) {
-                        refreshActivityDataDirectly();
-                    }
-                }, 500);
+                // Immediate refresh without delays
+                refreshActivityDataDirectly();
             }
-        }
+            
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "Activity deletion failed: " + error);
+                
+                // Remove from deletion tracking
+                synchronized (currentlyDeletingActivities) {
+                    currentlyDeletingActivities.remove(activity.getId());
+                }
+                
+                // Dismiss dialog safely
+                try {
+                    if (progressDialog.isShowing()) {
+                        progressDialog.dismiss();
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Error dismissing progress dialog", e);
+                }
+                
+                // Show error briefly
+                if (infoPanelManager != null) {
+                    infoPanelManager.addCustomMessage("Delete failed: " + error, true);
+                }
+                
+                // Refresh to show current state
+                refreshActivityDataDirectly();
+            }
+        });
     }
+    
+
 
     // CRITICAL FIX: Add method to force refresh trip data after activity creation
     public void refreshTripData() {

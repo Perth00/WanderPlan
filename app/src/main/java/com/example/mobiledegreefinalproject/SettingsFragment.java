@@ -24,6 +24,7 @@ public class SettingsFragment extends Fragment {
     private TextView profileName;
     private LinearLayout profileLayout;
     private LinearLayout themeLayout;
+    private LinearLayout syncLayout;
     private LinearLayout feedbackLayout;
     private LinearLayout aboutLayout;
     private LinearLayout loginLayout;
@@ -31,6 +32,7 @@ public class SettingsFragment extends Fragment {
     private LinearLayout logoutLayout;
     private View dividerLogout;
     private UserManager userManager;
+    private SyncPreferences syncPrefs;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -44,6 +46,7 @@ public class SettingsFragment extends Fragment {
         
         try {
             userManager = UserManager.getInstance(requireContext());
+            syncPrefs = new SyncPreferences(requireContext());
             initViews(view);
             setupClickListeners();
             updateAuthenticationOptions();
@@ -62,6 +65,7 @@ public class SettingsFragment extends Fragment {
         try {
             updateAuthenticationOptions();
             updateProfile();
+            updateSyncVisibility();
         } catch (Exception e) {
             android.util.Log.e("SettingsFragment", "Error in onResume", e);
         }
@@ -72,6 +76,7 @@ public class SettingsFragment extends Fragment {
         profileName = view.findViewById(R.id.tv_profile_name);
         profileLayout = view.findViewById(R.id.layout_profile);
         themeLayout = view.findViewById(R.id.layout_theme);
+        syncLayout = view.findViewById(R.id.layout_sync);
         feedbackLayout = view.findViewById(R.id.layout_feedback);
         aboutLayout = view.findViewById(R.id.layout_about);
         loginLayout = view.findViewById(R.id.layout_login);
@@ -94,6 +99,13 @@ public class SettingsFragment extends Fragment {
         });
         
         themeLayout.setOnClickListener(v -> showThemeSelectionDialog());
+        
+        if (syncLayout != null) {
+            syncLayout.setOnClickListener(v -> showSyncSettingsDialog());
+            // Show/hide sync option based on authentication status
+            updateSyncVisibility();
+        }
+        
         feedbackLayout.setOnClickListener(v -> showFeedbackDialog());
         aboutLayout.setOnClickListener(v -> showAboutDialog());
         
@@ -215,6 +227,17 @@ public class SettingsFragment extends Fragment {
         }
     }
 
+    private void updateSyncVisibility() {
+        try {
+            if (syncLayout == null) return;
+            
+            // Sync option is available for all users (logged-in users can sync, guests will be prompted to login)
+            syncLayout.setVisibility(View.VISIBLE);
+        } catch (Exception e) {
+            android.util.Log.e("SettingsFragment", "Error updating sync visibility", e);
+        }
+    }
+
     private void showAboutDialog() {
         try {
             if (getContext() == null) return;
@@ -284,6 +307,129 @@ public class SettingsFragment extends Fragment {
         }
     }
     
+    private void showSyncSettingsDialog() {
+        if (userManager == null || syncPrefs == null) return;
+        
+        if (!userManager.isLoggedIn()) {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle("🔄 Data Sync")
+                    .setMessage("Data sync is only available for logged-in users.\n\nPlease log in to access sync settings.")
+                    .setPositiveButton("Login", (dialog, which) -> {
+                        Intent intent = new Intent(getActivity(), LoginActivity.class);
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+        
+        String syncSummary = syncPrefs.getSyncSummary();
+        boolean autoSyncEnabled = syncPrefs.isAutoSyncEnabled();
+        boolean syncOnLogin = syncPrefs.shouldSyncOnLogin();
+        
+        String message = "Current sync status:\n" + syncSummary + "\n\n" +
+                        "Auto Sync: " + (autoSyncEnabled ? "✅ Enabled" : "❌ Disabled") + "\n" +
+                        "Sync on Login: " + (syncOnLogin ? "✅ Enabled" : "❌ Disabled") + "\n\n" +
+                        "Choose an action:";
+        
+        new AlertDialog.Builder(requireContext())
+                .setTitle("🔄 Sync Settings")
+                .setMessage(message)
+                .setPositiveButton("🔄 Sync Now", (dialog, which) -> {
+                    performManualSync();
+                })
+                .setNeutralButton("⚙️ Settings", (dialog, which) -> {
+                    showSyncPreferencesDialog();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+    
+    private void performManualSync() {
+        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(getContext());
+        progressDialog.setTitle("🔄 Syncing Data");
+        progressDialog.setMessage("Converting local data to JSON and uploading...");
+        progressDialog.setCancelable(false);
+        progressDialog.setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL);
+        progressDialog.setMax(100);
+        progressDialog.show();
+        
+        DataSyncService syncService = new DataSyncService(requireContext());
+        syncService.syncLocalDataToFirebase(new DataSyncService.OnSyncCompleteListener() {
+            @Override
+            public void onProgressUpdate(int progress, String message) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        progressDialog.setProgress(progress);
+                        progressDialog.setMessage(message);
+                    });
+                }
+            }
+            
+            @Override
+            public void onSuccess(int tripsSynced, int activitiesSynced) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        progressDialog.dismiss();
+                        
+                        new AlertDialog.Builder(requireContext())
+                                .setTitle("✅ Sync Complete")
+                                .setMessage("🎉 Success!\n\n" +
+                                           "📊 Data synced to Firebase as JSON:\n" +
+                                           "🧳 Trips: " + tripsSynced + "\n" +
+                                           "📝 Activities: " + activitiesSynced + "\n\n" +
+                                           "Your data is now safely backed up in the cloud!")
+                                .setPositiveButton("OK", null)
+                                .show();
+                    });
+                }
+            }
+            
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        progressDialog.dismiss();
+                        
+                        new AlertDialog.Builder(requireContext())
+                                .setTitle("❌ Sync Failed")
+                                .setMessage("⚠️ There was an issue syncing your data:\n\n" + error)
+                                .setPositiveButton("OK", null)
+                                .show();
+                    });
+                }
+            }
+        });
+    }
+    
+    private void showSyncPreferencesDialog() {
+        boolean autoSync = syncPrefs.isAutoSyncEnabled();
+        boolean syncOnLogin = syncPrefs.shouldSyncOnLogin();
+        
+        String[] options = {
+            (autoSync ? "✅" : "☐") + " Auto Sync (every 24 hours)",
+            (syncOnLogin ? "✅" : "☐") + " Sync on Login"
+        };
+        
+        boolean[] checkedItems = {autoSync, syncOnLogin};
+        
+        new AlertDialog.Builder(requireContext())
+                .setTitle("⚙️ Sync Preferences")
+                .setMultiChoiceItems(options, checkedItems, (dialog, which, isChecked) -> {
+                    switch (which) {
+                        case 0:
+                            syncPrefs.setAutoSyncEnabled(isChecked);
+                            break;
+                        case 1:
+                            syncPrefs.setSyncOnLogin(isChecked);
+                            break;
+                    }
+                })
+                .setPositiveButton("Save", null)
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void showFeedbackDialog() {
         try {
             if (getContext() == null) return;

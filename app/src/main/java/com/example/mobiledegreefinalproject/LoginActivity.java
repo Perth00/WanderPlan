@@ -30,6 +30,7 @@ public class LoginActivity extends AppCompatActivity {
     
     private boolean isPasswordVisible = false;
     private UserManager userManager;
+    private SyncPreferences syncPrefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,6 +41,7 @@ public class LoginActivity extends AppCompatActivity {
         setupClickListeners();
         
         userManager = UserManager.getInstance(this);
+        syncPrefs = new SyncPreferences(this);
     }
 
     private void initViews() {
@@ -71,6 +73,13 @@ public class LoginActivity extends AppCompatActivity {
         
         continueAsGuestText.setOnClickListener(v -> {
             handleGuestMode();
+        });
+        
+        // Hidden debug option - long press to access Firebase test
+        continueAsGuestText.setOnLongClickListener(v -> {
+            Intent intent = new Intent(LoginActivity.this, FirebaseTestActivity.class);
+            startActivity(intent);
+            return true;
         });
     }
 
@@ -251,78 +260,404 @@ public class LoginActivity extends AppCompatActivity {
     }
     
     private void checkTripSyncStatus() {
-        // FIXED: Clear local trips and load only Firebase trips for logged-in users
-        clearLocalTripsAndLoadFirebaseTrips();
-    }
-    
-    private void clearLocalTripsAndLoadFirebaseTrips() {
-        android.util.Log.d("LoginActivity", "Clearing local trips and loading Firebase trips for logged-in user");
-        
-        // Show loading dialog
-        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
-        progressDialog.setMessage("Loading your cloud trips...");
-        progressDialog.setCancelable(false);
-        progressDialog.show();
-        
+        // Check if user has local data and ask what to do (don't auto-sync)
         com.example.mobiledegreefinalproject.repository.TripRepository repo = 
             com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
         
-        // Step 1: Clear all local trips
-        repo.clearAllLocalTrips();
-        android.util.Log.d("LoginActivity", "Local trips cleared");
+        new Thread(() -> {
+            try {
+                java.util.List<com.example.mobiledegreefinalproject.database.Trip> localTrips = repo.getAllTripsSync();
+                runOnUiThread(() -> {
+                    if (localTrips.size() > 0) {
+                        // User has local data - ask what they want to do
+                        showSyncChoiceDialog(localTrips.size());
+                    } else {
+                        // No local data - check if Firebase has data
+                        loadCloudDataOnly();
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("LoginActivity", "Error checking local trips", e);
+                runOnUiThread(() -> {
+                    // On error, just proceed to main activity
+                    navigateToMainActivity();
+                });
+            }
+        }).start();
+    }
+    
+    private void loadCloudDataOnly() {
+        android.util.Log.d("LoginActivity", "No local data found, checking for cloud data");
         
-        // Step 2: Fetch Firebase trips
+        // Use the existing TripRepository to check for Firebase data
+        com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+            com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
+        
+        // Show loading dialog
+        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+        progressDialog.setTitle("☁️ Loading Cloud Data");
+        progressDialog.setMessage("Checking for your data in Firebase...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+        
         repo.fetchTripsFromFirebase(new com.example.mobiledegreefinalproject.repository.TripRepository.OnTripSyncListener() {
             @Override
             public void onSuccess() {
-                android.util.Log.d("LoginActivity", "Firebase trips loaded successfully");
-                progressDialog.dismiss();
-                
-                // Show sync prompt dialog 
-                showSyncPromptDialog();
+                // Check how many trips were loaded
+                new Thread(() -> {
+                    try {
+                        java.util.List<com.example.mobiledegreefinalproject.database.Trip> trips = repo.getAllTripsSync();
+                        runOnUiThread(() -> {
+                            progressDialog.dismiss();
+                            if (trips.size() > 0) {
+                                showCloudDataLoadedDialog(trips.size(), 0);
+                            } else {
+                                navigateToMainActivity();
+                            }
+                        });
+                    } catch (Exception e) {
+                        runOnUiThread(() -> {
+                            progressDialog.dismiss();
+                            navigateToMainActivity();
+                        });
+                    }
+                }).start();
             }
             
             @Override
             public void onError(String error) {
-                android.util.Log.e("LoginActivity", "Error loading Firebase trips: " + error);
-                progressDialog.dismiss();
-                
-                // Still show sync prompt even if Firebase fetch failed
-                showSyncPromptDialog();
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    android.util.Log.w("LoginActivity", "No cloud data found: " + error);
+                    navigateToMainActivity();
+                });
             }
         });
     }
     
-    private void showSyncPromptDialog() {
+    private void clearLocalTripsAndLoadFirebaseTrips() {
+        android.util.Log.d("LoginActivity", "Clearing local data and loading cloud data in JSON format");
+        
+        // Show loading dialog
+        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+        progressDialog.setTitle("🗑️ Clearing Local Data");
+        progressDialog.setMessage("Deleting local trips and budget data...");
+        progressDialog.setCancelable(false);
+        progressDialog.setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL);
+        progressDialog.setMax(100);
+        progressDialog.show();
+        
+        // First clear all local data
+        new Thread(() -> {
+            try {
+                progressDialog.setMessage("🗑️ Clearing local trips...");
+                
+                // Clear local trips and activities
+                com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+                    com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
+                repo.clearAllLocalTrips();
+                
+                progressDialog.setProgress(30);
+                progressDialog.setMessage("🗑️ Clearing budget data...");
+                
+                // Clear budget data
+                UserManager userManager = UserManager.getInstance(this);
+                userManager.deleteTripBudgetRecords(-1, new UserManager.OnBudgetSyncListener() {
+                    @Override
+                    public void onSuccess() {
+                        runOnUiThread(() -> {
+                            progressDialog.setProgress(60);
+                            progressDialog.setMessage("☁️ Loading cloud data...");
+                            loadCloudData(progressDialog);
+                        });
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        android.util.Log.w("LoginActivity", "Failed to clear budget data: " + error);
+                        // Continue anyway
+                        runOnUiThread(() -> {
+                            progressDialog.setProgress(60);
+                            progressDialog.setMessage("☁️ Loading cloud data...");
+                            loadCloudData(progressDialog);
+                        });
+                    }
+                    
+                    @Override
+                    public void onSyncRequired(int localBudgetCount, int firebaseBudgetCount) {
+                        // Not relevant for clearing
+                    }
+                });
+                
+            } catch (Exception e) {
+                android.util.Log.e("LoginActivity", "Error clearing local data", e);
+                runOnUiThread(() -> {
+                    progressDialog.setProgress(60);
+                    progressDialog.setMessage("☁️ Loading cloud data...");
+                    loadCloudData(progressDialog);
+                });
+            }
+        }).start();
+    }
+    
+    private void loadCloudData(android.app.ProgressDialog progressDialog) {
+        progressDialog.setTitle("☁️ Loading Cloud Data");
+        progressDialog.setMessage("Retrieving your data from Firebase...");
+        progressDialog.setProgress(70);
+        
+        // Use the new DataRetrievalService to get JSON data
+        DataRetrievalService retrievalService = new DataRetrievalService(this);
+        retrievalService.retrieveDataFromFirebase(new DataRetrievalService.OnRetrievalCompleteListener() {
+            @Override
+            public void onProgressUpdate(int progress, String message) {
+                runOnUiThread(() -> {
+                    // Adjust progress to account for the clearing phase (already at 70%)
+                    int adjustedProgress = 70 + (progress * 30 / 100);
+                    progressDialog.setProgress(adjustedProgress);
+                    progressDialog.setMessage(message);
+                });
+            }
+            
+            @Override
+            public void onSuccess(int tripsRetrieved, int activitiesRetrieved) {
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    
+                    if (tripsRetrieved > 0) {
+                        showCloudDataLoadedDialog(tripsRetrieved, activitiesRetrieved);
+                    } else {
+                        // No cloud data found, proceed to main activity
+                        showNoCloudDataDialog();
+                    }
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    showCloudLoadErrorDialog(error);
+                });
+            }
+        });
+    }
+    
+    private void showNoCloudDataDialog() {
         new android.app.AlertDialog.Builder(this)
-                .setTitle("🔄 Sync Your Data")
-                .setMessage("📱 Welcome back!\n\n" +
-                           "Would you like to sync your trips and activities?\n\n" +
-                           "✅ Keep your data up to date\n" +
-                           "☁️ Backup to the cloud\n" +
-                           "📱 Access from any device")
-                .setPositiveButton("🔄 Sync Now", (dialog, which) -> {
-                    showComingSoonSyncDialog();
+                .setTitle("ℹ️ No Cloud Data")
+                .setMessage("🗑️ Local data has been cleared.\n\n" +
+                           "ℹ️ No cloud data found to restore.\n\n" +
+                           "You can start creating new trips!")
+                .setPositiveButton("Continue", (dialog, which) -> {
+                    navigateToMainActivity();
                 })
-                .setNegativeButton("⏭️ Skip for Now", (dialog, which) -> {
+                .setIcon(android.R.drawable.ic_dialog_info)
+                .show();
+    }
+    
+    private void showCloudDataLoadedDialog(int tripsLoaded, int activitiesLoaded) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("✅ Cloud Data Loaded")
+                .setMessage("🎉 Successfully loaded your data from the cloud!\n\n" +
+                           "📊 Data restored from Firebase JSON:\n" +
+                           "🧳 Trips: " + tripsLoaded + "\n" +
+                           "📝 Activities: " + activitiesLoaded + "\n\n" +
+                           "Your local database has been updated with your cloud data.")
+                .setPositiveButton("Continue", (dialog, which) -> {
+                    navigateToMainActivity();
+                })
+                .setIcon(android.R.drawable.ic_dialog_info)
+                .show();
+    }
+    
+    private void showCloudLoadErrorDialog(String error) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("❌ Cloud Load Failed")
+                .setMessage("⚠️ There was an issue loading your cloud data:\n\n" + error + 
+                           "\n\nYou can:\n" +
+                           "• Try again\n" +
+                           "• Continue with local data\n" +
+                           "• Your local data is still available")
+                .setPositiveButton("Try Again", (dialog, which) -> {
+                    clearLocalTripsAndLoadFirebaseTrips();
+                })
+                .setNegativeButton("Continue with Local", (dialog, which) -> {
+                    navigateToMainActivity();
+                })
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+    
+    private void showSyncPromptDialog() {
+        // Check if user has disabled sync on login
+        if (!syncPrefs.shouldSyncOnLogin()) {
+            navigateToMainActivity();
+            return;
+        }
+        
+        // Check if user has local data
+        new Thread(() -> {
+            com.example.mobiledegreefinalproject.repository.TripRepository repo = 
+                com.example.mobiledegreefinalproject.repository.TripRepository.getInstance(this);
+            
+            java.util.List<com.example.mobiledegreefinalproject.database.Trip> localTrips = repo.getAllTripsSync();
+            
+            runOnUiThread(() -> {
+                if (localTrips.isEmpty()) {
+                    // No local data, just load from cloud
+                    clearLocalTripsAndLoadFirebaseTrips();
+                } else {
+                    // Has local data, show sync choice dialog
+                    showSyncChoiceDialog(localTrips.size());
+                }
+            });
+        }).start();
+    }
+    
+    private void showSyncChoiceDialog(int localTripsCount) {
+        String message = "📱 Welcome back!\n\n" +
+                        "You have " + localTripsCount + " trips stored locally.\n\n" +
+                        "Choose what to do with your data:\n\n" +
+                        "🔄 BACKUP TO CLOUD:\n" +
+                        "• Upload your local trips to Firebase\n" +
+                        "• Upload all activity images to Firebase Storage\n" +
+                        "• Your local data stays safe on device\n" +
+                        "• Create cloud backup for access anywhere\n\n" +
+                        "☁️ USE CLOUD ONLY:\n" +
+                        "• Delete ALL local trips & activities\n" +
+                        "• Download cloud data (if any exists)\n" +
+                        "• ⚠️ WARNING: Local data will be lost!\n\n" +
+                        "📱 KEEP LOCAL ONLY:\n" +
+                        "• Continue with local data only\n" +
+                        "• No changes to your data\n" +
+                        "• No cloud backup created";
+        
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("🔄 Data Sync Choice")
+                .setMessage(message)
+                .setPositiveButton("🔄 Backup to Cloud", (dialog, which) -> {
+                    startDataSync();
+                })
+                .setNegativeButton("☁️ Use Cloud Only", (dialog, which) -> {
+                    showClearLocalDataConfirmation();
+                })
+                .setNeutralButton("📱 Keep Local Only", (dialog, which) -> {
                     navigateToMainActivity();
                 })
                 .setCancelable(false)
                 .show();
     }
     
-    private void showComingSoonSyncDialog() {
+    private void showClearLocalDataConfirmation() {
         new android.app.AlertDialog.Builder(this)
-                .setTitle("🔄 Data Sync")
-                .setMessage("🚧 Sync Feature Coming Soon!\n\n" +
-                           "We're working on improving the data synchronization feature.\n\n" +
-                           "📱 Your trips and activities are automatically saved locally\n" +
-                           "☁️ Cloud sync will be available in the next update\n\n" +
-                           "Stay tuned for enhanced data synchronization!")
-                .setPositiveButton("Got it", (dialog, which) -> {
+                .setTitle("⚠️ Delete Local Data?")
+                .setMessage("🗑️ This will permanently delete:\n\n" +
+                           "• All local trips\n" +
+                           "• All local activities  \n" +
+                           "• All local budget data\n\n" +
+                           "Then download your cloud data (if any).\n\n" +
+                           "Are you sure you want to continue?")
+                .setPositiveButton("🗑️ Yes, Delete Local Data", (dialog, which) -> {
+                    clearLocalTripsAndLoadFirebaseTrips();
+                })
+                .setNegativeButton("❌ Cancel", (dialog, which) -> {
+                    showSyncChoiceDialog(-1); // Go back to sync choice
+                })
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+    
+    private void showUseCloudOnlyConfirmDialog() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("⚠️ Confirm Cloud Only")
+                .setMessage("This will clear your local data and use only cloud data.\n\nAre you sure you want to proceed?")
+                .setPositiveButton("Yes, Use Cloud Only", (dialog, which) -> {
+                    clearLocalTripsAndLoadFirebaseTrips();
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> {
+                    showSyncPromptDialog();
+                })
+                .show();
+    }
+    
+    private void startDataSync() {
+        // Show progress dialog
+        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+        progressDialog.setTitle("🔄 Creating Cloud Backup");
+        progressDialog.setMessage("Uploading your trips to Firebase (local data preserved)...");
+        progressDialog.setCancelable(false);
+        progressDialog.setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL);
+        progressDialog.setMax(100);
+        progressDialog.show();
+        
+        // Create and start sync service
+        DataSyncService syncService = new DataSyncService(this);
+        syncService.syncLocalDataToFirebase(new DataSyncService.OnSyncCompleteListener() {
+            @Override
+            public void onProgressUpdate(int progress, String message) {
+                runOnUiThread(() -> {
+                    progressDialog.setProgress(progress);
+                    progressDialog.setMessage(message);
+                });
+            }
+            
+            @Override
+            public void onSuccess(int tripsSynced, int activitiesSynced) {
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    showSyncSuccessDialog(tripsSynced, activitiesSynced);
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    showSyncErrorDialog(error);
+                });
+            }
+        });
+    }
+    
+    private void showSyncSuccessDialog(int tripsSynced, int activitiesSynced) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("✅ Backup Complete")
+                .setMessage("🎉 Success!\n\n" +
+                           "📊 Data backed up to Firebase:\n" +
+                           "🧳 Trips: " + tripsSynced + "\n" +
+                           "📝 Activities: " + activitiesSynced + "\n" +
+                           "🖼️ Images: Uploaded to Firebase Storage\n\n" +
+                           "✅ Your local data is still safe on this device\n" +
+                           "☁️ Cloud backup created for access anywhere!")
+                .setPositiveButton("Continue", (dialog, which) -> {
                     navigateToMainActivity();
                 })
-                .setIcon(android.R.drawable.ic_popup_sync)
+                .setIcon(android.R.drawable.ic_dialog_info)
                 .show();
+    }
+    
+    private void showSyncErrorDialog(String error) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("❌ Backup Failed")
+                .setMessage("⚠️ There was an issue creating your cloud backup:\n\n" + error + 
+                           "\n\nDon't worry:\n" +
+                           "✅ Your local data is completely safe\n" +
+                           "✅ All trips are still available on this device\n\n" +
+                           "You can:\n" +
+                           "• Try backup again later\n" +
+                           "• Continue using local data")
+                .setPositiveButton("Try Again", (dialog, which) -> {
+                    startDataSync();
+                })
+                .setNegativeButton("Continue with Local", (dialog, which) -> {
+                    navigateToMainActivity();
+                })
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+    
+    private void showComingSoonSyncDialog() {
+        // This method is now replaced by the actual sync functionality above
+        startDataSync();
     }
 } 

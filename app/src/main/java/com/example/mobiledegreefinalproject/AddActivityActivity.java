@@ -37,6 +37,7 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.List;
@@ -390,8 +391,8 @@ public class AddActivityActivity extends AppCompatActivity {
         UserManager userManager = UserManager.getInstance(this);
         
         if (!userManager.isLoggedIn()) {
-            // Save locally for guest users
-            saveActivityToDatabase(title, description, location, dayNumber, selectedImageUri.toString());
+            // For guest users: copy image to internal storage for later Firebase upload
+            copyImageToInternalStorage(title, description, location, dayNumber);
             return;
         }
         
@@ -566,6 +567,77 @@ public class AddActivityActivity extends AppCompatActivity {
         }
     }
     
+    /**
+     * Copy image to internal storage for guest users (so it's available for later Firebase upload)
+     */
+    private void copyImageToInternalStorage(String title, String description, String location, int dayNumber) {
+        Log.d(TAG, "Copying guest image to internal storage for: " + title);
+        
+        // Use Glide to load and save the image to internal storage
+        Glide.with(this)
+                .asBitmap()
+                .load(selectedImageUri)
+                .override(1024, 1024) // Reasonable size
+                .into(new CustomTarget<Bitmap>() {
+                    @Override
+                    public void onResourceReady(@NonNull Bitmap bitmap, @Nullable Transition<? super Bitmap> transition) {
+                        // Save bitmap to internal storage
+                        String savedPath = saveBitmapToInternalStorage(bitmap, title);
+                        if (savedPath != null) {
+                            Log.d(TAG, "✅ Guest image saved to internal storage: " + savedPath);
+                            saveActivityToDatabase(title, description, location, dayNumber, savedPath);
+                        } else {
+                            Log.w(TAG, "⚠️ Failed to save guest image, saving without image");
+                            saveActivityToDatabase(title, description, location, dayNumber, null);
+                        }
+                    }
+
+                    @Override
+                    public void onLoadCleared(@Nullable Drawable placeholder) {
+                        Log.w(TAG, "⚠️ Glide load cleared for guest image, saving without image");
+                        saveActivityToDatabase(title, description, location, dayNumber, null);
+                    }
+
+                    @Override
+                    public void onLoadFailed(@Nullable Drawable errorDrawable) {
+                        Log.w(TAG, "⚠️ Failed to load guest image, saving without image");
+                        saveActivityToDatabase(title, description, location, dayNumber, null);
+                    }
+                });
+    }
+    
+    /**
+     * Save bitmap to internal storage and return file path
+     */
+    private String saveBitmapToInternalStorage(Bitmap bitmap, String activityTitle) {
+        try {
+            // Create images directory in internal storage
+            File imagesDir = new File(getFilesDir(), "activity_images");
+            if (!imagesDir.exists()) {
+                imagesDir.mkdirs();
+            }
+            
+            // Create unique filename
+            String filename = "activity_" + System.currentTimeMillis() + "_" + 
+                            activityTitle.replaceAll("[^a-zA-Z0-9]", "") + ".jpg";
+            File imageFile = new File(imagesDir, filename);
+            
+            // Save bitmap to file
+            java.io.FileOutputStream outputStream = new java.io.FileOutputStream(imageFile);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream); // Good quality
+            outputStream.flush();
+            outputStream.close();
+            
+            String savedPath = imageFile.getAbsolutePath();
+            Log.d(TAG, "📷 Bitmap saved to internal storage: " + savedPath);
+            return savedPath;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error saving bitmap to internal storage", e);
+            return null;
+        }
+    }
+
     private void saveActivityToDatabase(String title, String description, String location, int dayNumber, String imageUrl) {
         // CRITICAL FIX: Check activity state before database operations
         if (isFinishing() || isDestroyed()) {

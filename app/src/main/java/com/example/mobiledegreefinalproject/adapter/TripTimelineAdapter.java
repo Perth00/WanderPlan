@@ -129,6 +129,7 @@ public class TripTimelineAdapter extends RecyclerView.Adapter<TripTimelineAdapte
             private final TextView titleText;
             private final TextView descriptionText;
             private final ImageView activityImage;
+            private long lastLongClickTime = 0;
 
             public ActivityViewHolder(@NonNull View itemView) {
                 super(itemView);
@@ -177,8 +178,15 @@ public class TripTimelineAdapter extends RecyclerView.Adapter<TripTimelineAdapte
                     }
                 });
 
-                // Set long click listener for deleting
+                // Set long click listener for deleting with minimal throttling
                 itemView.setOnLongClickListener(v -> {
+                    long currentTime = System.currentTimeMillis();
+                    // Minimal throttling to prevent accidental double-clicks (300ms)
+                    if (currentTime - lastLongClickTime < 300) {
+                        return true; // Consume the click but don't act on it
+                    }
+                    lastLongClickTime = currentTime;
+                    
                     if (clickListener != null) {
                         clickListener.onActivityLongClick(activity);
                     }

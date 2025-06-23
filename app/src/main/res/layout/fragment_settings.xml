@@ -132,6 +132,47 @@
                 android:layout_marginHorizontal="16dp"
                 android:background="@color/light_grey" />
 
+            <!-- Data Sync -->
+            <LinearLayout
+                android:id="@+id/layout_sync"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="Data Sync"
+                    android:src="@drawable/ic_settings"
+                    app:tint="@color/primary" />
+
+                <TextView
+                    style="@style/WanderPlan.Text.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/data_sync" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="Sync settings"
+                    android:src="@drawable/ic_add"
+                    app:tint="@color/medium_grey" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginHorizontal="16dp"
+                android:background="@color/light_grey" />
+
             <!-- Feedback -->
             <LinearLayout
                 android:id="@+id/layout_feedback"
