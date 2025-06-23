@@ -1198,10 +1198,14 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
         if (context == null || expense == null) return;
         
         try {
-            new AlertDialog.Builder(context)
-                .setTitle("Delete Expense")
-                .setMessage("Are you sure you want to delete \"" + expense.getTitle() + "\"?")
-                .setPositiveButton("Delete", (dialog, which) -> {
+            String message = "Are you sure you want to delete \"" + expense.getTitle() + "\"?\n\n" +
+                           "This action cannot be undone.";
+            
+            DeleteDialogHelper.showDeleteDialog(
+                context,
+                "Delete Expense",
+                message,
+                () -> { // On confirm delete
                     try {
                         // CRITICAL FIX: Also delete from Firebase if user is logged in
                         if (userManager != null && userManager.isLoggedIn() && budgetRepository != null) {
@@ -1259,9 +1263,9 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                         Log.e(TAG, "Error deleting expense", e);
                         showErrorToast("Error deleting expense");
                     }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+                }, // End of on confirm delete
+                null // On cancel (no action needed)
+            );
         } catch (Exception e) {
             Log.e(TAG, "Error showing delete confirmation dialog", e);
             showErrorToast("Error showing delete dialog");
@@ -2255,6 +2259,9 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
     public void onDestroy() {
         super.onDestroy();
         try {
+            // Release MediaPlayer resources from DeleteDialogHelper
+            DeleteDialogHelper.releaseMediaPlayer();
+            
             if (successSound != null) {
                 successSound.release();
                 successSound = null;

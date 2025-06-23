@@ -145,13 +145,16 @@ public class TripsFragment extends Fragment {
     private void showDeleteTripDialog(Trip trip) {
         if (getContext() == null) return;
         
-        new AlertDialog.Builder(getContext())
-                .setTitle("Delete Trip")
-                .setMessage("Are you sure you want to delete \"" + trip.getTitle() + "\"?\n\nThis will also delete all activities for this trip. This action cannot be undone.")
-                .setPositiveButton("Delete", (dialog, which) -> deleteTrip(trip))
-                .setNegativeButton("Cancel", null)
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .show();
+        String message = "Are you sure you want to delete \"" + trip.getTitle() + "\"?\n\n" +
+                        "This will also delete all activities for this trip. This action cannot be undone.";
+        
+        DeleteDialogHelper.showDeleteDialog(
+            getContext(),
+            "Delete Trip",
+            message,
+            () -> deleteTrip(trip), // On confirm delete
+            null // On cancel (no action needed)
+        );
     }
 
     private void deleteTrip(Trip trip) {
@@ -321,6 +324,8 @@ public class TripsFragment extends Fragment {
     public void onDestroy() {
         super.onDestroy();
         android.util.Log.d("TripsFragment", "onDestroy called - cleaning up");
+        // Release MediaPlayer resources from DeleteDialogHelper
+        DeleteDialogHelper.releaseMediaPlayer();
         // Clear references to prevent memory leaks
         tripsAdapter = null;
         viewModel = null;

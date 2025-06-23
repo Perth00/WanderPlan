@@ -293,8 +293,11 @@ public class ProfileActivity extends AppCompatActivity {
                             // Update the displayed image
                             updateProfileImageDisplay(imageUrl);
                             
-                            // Show success message
-                            Toast.makeText(ProfileActivity.this, "Profile picture updated successfully!", Toast.LENGTH_SHORT).show();
+                            // Show success dialog instead of toast
+                            SuccessDialogHelper.showSuccessDialog(
+                                ProfileActivity.this,
+                                "Profile picture updated successfully!"
+                            );
                             
                             // Reset icon color after 2 seconds
                             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
@@ -367,28 +370,58 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void saveChanges() {
         try {
-        String newName = nameEditText.getText().toString().trim();
-        
-        if (newName.isEmpty()) {
-            nameInputLayout.setError("Name cannot be empty");
-            return;
-        }
-        
-            // Clear any previous errors
-        nameInputLayout.setError(null);
+            String newName = nameEditText.getText().toString().trim();
             
-            // Save the name
-        userManager.setUserName(newName);
-        
-        hasChanges = false;
-        updateSaveButtonState();
-        
-            Toast.makeText(this, "Changes saved successfully!", Toast.LENGTH_SHORT).show();
-            android.util.Log.d("ProfileActivity", "Profile changes saved: " + newName);
+            if (newName.isEmpty()) {
+                nameInputLayout.setError("Name cannot be empty");
+                return;
+            }
+            
+            // Clear any previous errors
+            nameInputLayout.setError(null);
+            
+            // Disable save button during save
+            saveButton.setEnabled(false);
+            saveButton.setText("Saving...");
+            
+            // Save the name to Firebase AND locally
+            userManager.setUserName(newName, new UserManager.OnProfileUpdateListener() {
+                @Override
+                public void onSuccess() {
+                    runOnUiThread(() -> {
+                        hasChanges = false;
+                        updateSaveButtonState();
+                        saveButton.setText("Save Changes");
+                        
+                        // Show success dialog instead of toast
+                        SuccessDialogHelper.showSuccessDialog(
+                            ProfileActivity.this,
+                            "Username updated successfully!"
+                        );
+                        
+                        android.util.Log.d("ProfileActivity", "Profile changes saved to Firebase: " + newName);
+                    });
+                }
+                
+                @Override
+                public void onError(String error) {
+                    runOnUiThread(() -> {
+                        saveButton.setEnabled(true);
+                        saveButton.setText("Save Changes");
+                        
+                        Toast.makeText(ProfileActivity.this, "Failed to save username: " + error, Toast.LENGTH_LONG).show();
+                        android.util.Log.e("ProfileActivity", "Failed to save to Firebase: " + error);
+                    });
+                }
+            });
             
         } catch (Exception e) {
             android.util.Log.e("ProfileActivity", "Error saving changes", e);
             Toast.makeText(this, "Error saving changes: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            
+            // Reset button state
+            saveButton.setEnabled(true);
+            saveButton.setText("Save Changes");
         }
     }
 
@@ -446,6 +479,17 @@ public class ProfileActivity extends AppCompatActivity {
         } catch (Exception e) {
             android.util.Log.e("ProfileActivity", "Error going back", e);
             Toast.makeText(this, "Error going back", Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    @Override
+    protected void onDestroy() {
+        try {
+            // Release MediaPlayer resources from SuccessDialogHelper
+            SuccessDialogHelper.releaseMediaPlayer();
+            super.onDestroy();
+        } catch (Exception e) {
+            android.util.Log.e("ProfileActivity", "Error in onDestroy", e);
         }
     }
 } 
