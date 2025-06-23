@@ -965,12 +965,16 @@ public class TripDetailActivity extends AppCompatActivity {
             return;
         }
         
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("Delete Trip")
-                .setMessage("Are you sure you want to delete \"" + currentTrip.getTitle() + "\"?\n\nThis action cannot be undone.")
-                .setPositiveButton("Delete", (dialog, which) -> deleteTrip())
-                .setNegativeButton("Cancel", null)
-                .show();
+        String message = "Are you sure you want to delete \"" + currentTrip.getTitle() + "\"?\n\n" +
+                        "This action cannot be undone.";
+        
+        DeleteDialogHelper.showDeleteDialog(
+            this,
+            "Delete Trip",
+            message,
+            () -> deleteTrip(), // On confirm delete
+            null // On cancel (no action needed)
+        );
     }
 
     private void deleteTrip() {
@@ -1016,12 +1020,16 @@ public class TripDetailActivity extends AppCompatActivity {
     }
 
     private void showDeleteActivityDialog(TripActivity activity) {
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("Delete Activity")
-                .setMessage("Are you sure you want to delete \"" + activity.getTitle() + "\"?\n\nThis action cannot be undone.")
-                .setPositiveButton("Delete", (dialog, which) -> deleteActivity(activity))
-                .setNegativeButton("Cancel", null)
-                .show();
+        String message = "Are you sure you want to delete \"" + activity.getTitle() + "\"?\n\n" +
+                        "This action cannot be undone.";
+        
+        DeleteDialogHelper.showDeleteDialog(
+            this,
+            "Delete Activity",
+            message,
+            () -> deleteActivity(activity), // On confirm delete
+            null // On cancel (no action needed)
+        );
     }
 
     private void deleteActivity(TripActivity activity) {
@@ -1998,6 +2006,9 @@ public class TripDetailActivity extends AppCompatActivity {
         
         super.onDestroy();
         Log.d(TAG, "onDestroy() called - cleaning up resources");
+        
+        // Release MediaPlayer resources from DeleteDialogHelper
+        DeleteDialogHelper.releaseMediaPlayer();
         
         // CRITICAL FIX: Clear any ongoing operations to prevent crashes
         try {

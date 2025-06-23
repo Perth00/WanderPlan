@@ -36,7 +36,8 @@ public class SuccessDialogHelper {
             builder.setView(dialogView);
             
             AlertDialog dialog = builder.create();
-            dialog.setCancelable(true);
+            dialog.setCancelable(false); // Prevent user from cancelling during success animation
+            dialog.setCanceledOnTouchOutside(false); // Prevent dismissing by tapping outside
             
             // Set transparent background
             if (dialog.getWindow() != null) {

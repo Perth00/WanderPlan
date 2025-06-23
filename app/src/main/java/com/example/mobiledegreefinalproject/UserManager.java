@@ -386,35 +386,39 @@ public class UserManager {
         firestore.collection("users").document(user.getUid())
             .get()
             .addOnSuccessListener(documentSnapshot -> {
+                String firestoreName = null;
+                String firestoreImageUrl = null;
+                
                 if (documentSnapshot.exists()) {
-                    String name = documentSnapshot.getString("name");
-                    String profileImageUrl = documentSnapshot.getString("profileImageUrl");
+                    firestoreName = documentSnapshot.getString("name");
+                    firestoreImageUrl = documentSnapshot.getString("profileImageUrl");
                     
-                    if (name != null && !name.trim().isEmpty()) {
-                        setUserName(name);
-                    }
-                    
-                    if (profileImageUrl != null && !profileImageUrl.trim().isEmpty()) {
-                        setProfileImageUrl(profileImageUrl);
-                    }
-                    
-                    Log.d(TAG, "User data synced from Firestore");
+                    Log.d(TAG, "User data found in Firestore - Name: " + firestoreName);
                 } else {
                     Log.d(TAG, "No user document in Firestore");
                 }
                 
-                // Also sync from Firebase Auth
-                if (user.getDisplayName() != null) {
+                // Prioritize Firestore data over Firebase Auth data
+                // Use Firestore name if available, otherwise fallback to Firebase Auth
+                if (firestoreName != null && !firestoreName.trim().isEmpty()) {
+                    setUserName(firestoreName);
+                    Log.d(TAG, "Using Firestore name: " + firestoreName);
+                } else if (user.getDisplayName() != null && !user.getDisplayName().trim().isEmpty()) {
                     setUserName(user.getDisplayName());
+                    Log.d(TAG, "Using Firebase Auth display name: " + user.getDisplayName());
                 }
                 
-                if (user.getEmail() != null) {
-                    setUserEmail(user.getEmail());
-                }
-                
-                if (user.getPhotoUrl() != null) {
-                    setProfileImageUrl(user.getPhotoUrl().toString());
-                }
+                                 // Handle profile image URL
+                 if (firestoreImageUrl != null && !firestoreImageUrl.trim().isEmpty()) {
+                     setProfileImageUrl(firestoreImageUrl);
+                 } else if (user.getPhotoUrl() != null) {
+                     setProfileImageUrl(user.getPhotoUrl().toString());
+                 }
+                 
+                 // Always sync email from Firebase Auth
+                 if (user.getEmail() != null) {
+                     setUserEmail(user.getEmail());
+                 }
                 
                 if (listener != null) {
                     listener.onSuccess();
