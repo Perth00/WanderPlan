@@ -44,6 +44,12 @@ public class TripRepository {
     private final Map<String, Long> deletionTimestamps = new HashMap<>();
     private static final long DELETION_TIMEOUT_MS = 5000; // FIXED: 5 seconds timeout instead of 30 seconds for faster cleanup
     
+    // CRITICAL FIX: Add flag to disable real-time updates when using direct Firebase loading
+    private boolean realTimeUpdatesEnabled = true;
+    
+    // NUCLEAR PROTECTION: Completely block operations when in Firebase-only mode
+    private boolean isNuclearFirebaseMode = false;
+    
     private TripRepository(Context context) {
         try {
             Log.d(TAG, "Initializing TripRepository");
@@ -787,8 +793,10 @@ public class TripRepository {
     private LiveData<List<TripActivity>> getActivitiesFromFirebaseFirst(int tripId) {
         Log.d(TAG, "=== FIREBASE-FIRST ACTIVITY RETRIEVAL for trip: " + tripId + " ===");
         
-        // Clean up any local duplicates first
-        cleanupLocalDuplicateActivities(tripId);
+        // CRITICAL FIX: DO NOT clean up duplicates for Firebase users!
+        // This was causing data to disappear when the cleanup modified local data
+        // cleanupLocalDuplicateActivities(tripId); // DISABLED - causes UI flicker
+        Log.d(TAG, "SKIPPING duplicate cleanup for Firebase user to prevent UI interference");
         
         // First, return local data immediately for fast UI
         LiveData<List<TripActivity>> localData = activityDao.getActivitiesForTrip(tripId);
@@ -810,8 +818,8 @@ public class TripRepository {
                 
                 if (hasRecentActivity) {
                     Log.d(TAG, "Local data is recent, skipping Firebase refresh for trip: " + tripId);
-                    // Even with recent data, run a quick duplicate cleanup
-                    cleanupLocalDuplicateActivities(tripId);
+                    // CRITICAL FIX: Disable cleanup that deletes synced Firebase activities
+                    // cleanupLocalDuplicateActivities(tripId); // DISABLED - was deleting displayed Firebase data!
                     return;
                 }
                 
@@ -851,22 +859,9 @@ public class TripRepository {
                     try {
                         Log.d(TAG, "Found " + activitySnapshot.size() + " activities for trip " + tripFirebaseId);
                         
-                        // CRITICAL FIX: Clear existing Firebase-synced activities before reloading
-                        // to prevent duplicates when activities are re-loaded
+                        // IMPROVED: Only remove duplicates instead of clearing all Firebase activities
                         List<TripActivity> existingActivities = activityDao.getActivitiesForTripSync(localTripId);
-                        int removedCount = 0;
-                        for (TripActivity existing : existingActivities) {
-                            if (existing.getFirebaseId() != null && !existing.getFirebaseId().isEmpty()) {
-                                // Only remove Firebase-synced activities, keep local-only ones
-                                activityDao.deleteActivity(existing);
-                                removedCount++;
-                                Log.d(TAG, "Cleared existing Firebase activity: " + existing.getTitle());
-                            }
-                        }
-                        
-                        if (removedCount > 0) {
-                            Log.d(TAG, "✓ Cleared " + removedCount + " existing Firebase activities to prevent duplicates");
-                        }
+                        Log.d(TAG, "Found " + existingActivities.size() + " existing local activities for comparison");
                         
                         // Now process all Firebase activities
                         for (com.google.firebase.firestore.QueryDocumentSnapshot activityDoc : activitySnapshot) {
@@ -910,14 +905,14 @@ public class TripRepository {
                 
                 // CRITICAL FIX: Add synchronization for logged-in users to prevent data corruption
                 synchronized (this) {
-                    // Step 0: Check for potential duplicates before saving
+                    // Step 0: Check for potential duplicates before saving (more lenient check)
                     if (userManager.isLoggedIn() && !FORCE_LOCAL_ONLY) {
                         List<TripActivity> existingActivities = activityDao.getActivitiesForTripSync(activity.getTripId());
                         for (TripActivity existing : existingActivities) {
-                            // Check if similar activity exists (same title and within 5 minutes)
+                            // Check if exact duplicate exists (same title and within 30 seconds)
                             if (existing.getTitle().equals(activity.getTitle()) &&
-                                Math.abs(existing.getDateTime() - activity.getDateTime()) < 300000) { // 5 minutes
-                                Log.w(TAG, "Similar activity already exists, skipping duplicate insertion");
+                                Math.abs(existing.getDateTime() - activity.getDateTime()) < 30000) { // 30 seconds only
+                                Log.w(TAG, "Exact duplicate activity detected, skipping insertion");
                                 if (listener != null) {
                                     listener.onSuccess(existing.getId());
                                 }
@@ -1774,6 +1769,12 @@ public class TripRepository {
     
     // Clean up duplicate activities in local database
     private void cleanupLocalDuplicateActivities(int tripId) {
+        // NUCLEAR PROTECTION: Absolutely block cleanup in Firebase-only mode
+        if (isNuclearFirebaseMode) {
+            Log.w(TAG, "🔥🚨 NUCLEAR PROTECTION: Blocking cleanupLocalDuplicateActivities in Firebase-only mode!");
+            return;
+        }
+        
         executor.execute(() -> {
             try {
                 Log.d(TAG, "Checking for local duplicate activities in trip: " + tripId);
@@ -1879,8 +1880,8 @@ public class TripRepository {
                                 if (completed[0] >= totalTrips) {
                                     Log.d(TAG, "Force sync of all activities completed");
                                     
-                                    // Clean up any duplicate activities that might have been created
-                                    cleanupLocalDuplicateActivities(-1); // -1 means all trips
+                                    // CRITICAL FIX: Disable cleanup that deletes synced Firebase activities
+                                    // cleanupLocalDuplicateActivities(-1); // DISABLED - was deleting displayed Firebase data!
                                     
                                     if (listener != null) {
                                         new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
@@ -2036,6 +2037,12 @@ public class TripRepository {
                 
                 if (querySnapshot != null) {
                     Log.d(TAG, "Real-time activities update received: " + querySnapshot.size() + " activities");
+                    
+                    // CRITICAL FIX: Check if real-time updates are enabled
+                    if (!realTimeUpdatesEnabled) {
+                        Log.d(TAG, "Real-time updates DISABLED - skipping to prevent UI interference");
+                        return;
+                    }
                     
                     executor.execute(() -> {
                         try {
@@ -2226,6 +2233,18 @@ public class TripRepository {
     }
 
     private void processFirebaseActivityDocument(com.google.firebase.firestore.QueryDocumentSnapshot doc, int localTripId) {
+        // NUCLEAR PROTECTION: Absolutely prevent all local operations in Firebase-only mode
+        if (isNuclearFirebaseMode) {
+            Log.w(TAG, "🔥🚨 NUCLEAR PROTECTION: Blocking processFirebaseActivityDocument in Firebase-only mode!");
+            return;
+        }
+        
+        // CRITICAL FIX: Check if real-time updates are disabled to prevent local database modifications
+        if (!realTimeUpdatesEnabled) {
+            Log.d(TAG, "Real-time updates DISABLED - skipping Firebase activity processing to prevent local DB changes");
+            return;
+        }
+        
         try {
             String firebaseId = doc.getId();
             
@@ -2399,6 +2418,30 @@ public class TripRepository {
         }
     }
 
+    // CRITICAL FIX: Methods to control real-time updates
+    public void disableRealTimeUpdates() {
+        Log.d(TAG, "🔴 DISABLING real-time Firebase updates to prevent UI interference");
+        realTimeUpdatesEnabled = false;
+    }
+    
+    public void enableRealTimeUpdates() {
+        Log.d(TAG, "🟢 ENABLING real-time Firebase updates");
+        realTimeUpdatesEnabled = true;
+    }
+    
+    // NUCLEAR PROTECTION METHODS
+    public void enableNuclearFirebaseMode() {
+        Log.d(TAG, "🔥🔥🔥 NUCLEAR: Enabling complete Firebase-only mode - ALL local operations blocked");
+        isNuclearFirebaseMode = true;
+        disableRealTimeUpdates();
+    }
+    
+    public void disableNuclearFirebaseMode() {
+        Log.d(TAG, "🔥 NUCLEAR: Disabling Firebase-only mode - local operations allowed");
+        isNuclearFirebaseMode = false;
+        enableRealTimeUpdates();
+    }
+
     // Interfaces
     public interface OnTripOperationListener {
         void onSuccess(int tripId);
@@ -2413,5 +2456,79 @@ public class TripRepository {
     public interface OnTripSyncListener {
         void onSuccess();
         void onError(String error);
+    }
+
+    // NUCLEAR DELETE: Optimized deletion for Firebase-only mode
+    public void deleteActivityNuclear(TripActivity activity, OnActivityOperationListener listener) {
+        if (!isNuclearFirebaseMode) {
+            // Fall back to normal deletion if not in nuclear mode
+            deleteActivity(activity, listener);
+            return;
+        }
+        
+        Log.d(TAG, "🔥 NUCLEAR DELETE: Optimized Firebase-only deletion for: " + activity.getTitle());
+        
+        executor.execute(() -> {
+            try {
+                // In nuclear mode, prioritize Firebase deletion over local
+                if (userManager.isLoggedIn() && activity.getFirebaseId() != null && !activity.getFirebaseId().isEmpty()) {
+                    // Delete from Firebase first in nuclear mode
+                    Trip trip = tripDao.getTripByIdSync(activity.getTripId());
+                    if (trip != null && trip.getFirebaseId() != null) {
+                        Log.d(TAG, "🔥 NUCLEAR: Deleting from Firebase first");
+                        deleteActivityFromFirebase(activity, trip, new OnActivityOperationListener() {
+                            @Override
+                            public void onSuccess(int activityId) {
+                                // After Firebase deletion, remove from local
+                                try {
+                                    activityDao.deleteActivity(activity);
+                                    Log.d(TAG, "🔥 NUCLEAR: Local deletion completed after Firebase");
+                                    if (listener != null) {
+                                        listener.onSuccess(activityId);
+                                    }
+                                } catch (Exception e) {
+                                    Log.w(TAG, "🔥 NUCLEAR: Local deletion failed but Firebase succeeded", e);
+                                    // Firebase succeeded, so consider this successful
+                                    if (listener != null) {
+                                        listener.onSuccess(activityId);
+                                    }
+                                }
+                            }
+                            
+                            @Override
+                            public void onError(String error) {
+                                Log.w(TAG, "🔥 NUCLEAR: Firebase deletion failed, trying local fallback");
+                                try {
+                                    activityDao.deleteActivity(activity);
+                                    Log.d(TAG, "🔥 NUCLEAR: Local fallback deletion successful");
+                                    if (listener != null) {
+                                        listener.onSuccess(activity.getId());
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG, "🔥 NUCLEAR: Both Firebase and local deletion failed", e);
+                                    if (listener != null) {
+                                        listener.onError("Nuclear deletion failed: " + error);
+                                    }
+                                }
+                            }
+                        });
+                        return;
+                    }
+                }
+                
+                // Fallback to local deletion if no Firebase ID
+                activityDao.deleteActivity(activity);
+                Log.d(TAG, "🔥 NUCLEAR: Local-only deletion completed");
+                if (listener != null) {
+                    listener.onSuccess(activity.getId());
+                }
+                
+            } catch (Exception e) {
+                Log.e(TAG, "🔥 NUCLEAR: Deletion failed", e);
+                if (listener != null) {
+                    listener.onError("Nuclear deletion failed: " + e.getMessage());
+                }
+            }
+        });
     }
 }

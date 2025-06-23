@@ -372,12 +372,15 @@ public class SettingsFragment extends Fragment {
                     getActivity().runOnUiThread(() -> {
                         progressDialog.dismiss();
                         
+                        // Build message without showing "Activities: 0" when there are no activities
+                        String activitiesText = activitiesSynced > 0 ? "\n📝 Activities: " + activitiesSynced : "";
+                        
                         new AlertDialog.Builder(requireContext())
                                 .setTitle("✅ Sync Complete")
                                 .setMessage("🎉 Success!\n\n" +
                                            "📊 Data synced to Firebase as JSON:\n" +
-                                           "🧳 Trips: " + tripsSynced + "\n" +
-                                           "📝 Activities: " + activitiesSynced + "\n\n" +
+                                           "🧳 Trips: " + tripsSynced + 
+                                           activitiesText + "\n\n" +
                                            "Your data is now safely backed up in the cloud!")
                                 .setPositiveButton("OK", null)
                                 .show();

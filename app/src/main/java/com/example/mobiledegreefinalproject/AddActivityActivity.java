@@ -75,6 +75,8 @@ public class AddActivityActivity extends AppCompatActivity {
     // Modern replacement for startActivityForResult
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     
+
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -349,10 +351,29 @@ public class AddActivityActivity extends AppCompatActivity {
         
         // CRITICAL FIX: Validate that we have valid trip data
         if (currentTrip == null) {
+            Log.e(TAG, "Current trip is null, cannot save activity");
             Toast.makeText(this, "Trip data not loaded, please try again", Toast.LENGTH_SHORT).show();
             loadTripData(); // Try to reload trip data
             return;
         }
+        
+        // Add comprehensive validation
+        if (tripId <= 0) {
+            Log.e(TAG, "Invalid trip ID: " + tripId);
+            Toast.makeText(this, "Invalid trip data, please restart", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        if (selectedDateTime == null) {
+            Log.e(TAG, "Selected date/time is null");
+            Toast.makeText(this, "Please select a date and time", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        Log.d(TAG, "All validations passed, proceeding with save");
+        
+        // Add Firebase status logging
+        checkFirebaseStatus();
         
         // Calculate day number
         int dayNumber = calculateDayNumber(selectedDateTime.getTimeInMillis(), currentTrip.getStartDate());
@@ -373,11 +394,12 @@ public class AddActivityActivity extends AppCompatActivity {
             } else {
                 saveActivityToDatabase(title, description, location, dayNumber, uploadedImageUrl);
             }
+            
         } catch (Exception e) {
             Log.e(TAG, "Error in saveActivity", e);
             setLoadingState(false);
             btnSaveActivity.setTag(null); // Reset flag
-            Toast.makeText(this, "Error saving activity", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Error saving activity: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
     
@@ -647,143 +669,149 @@ public class AddActivityActivity extends AppCompatActivity {
         }
         
         try {
-            Log.d(TAG, "Starting to save activity to database");
+            Log.d(TAG, "Starting to save activity to Firebase as JSON");
+            Log.d(TAG, "Activity details - Title: " + title + ", Location: " + location + ", DayNumber: " + dayNumber + ", ImageURL: " + imageUrl);
+            Log.d(TAG, "Trip ID: " + tripId + ", DateTime: " + selectedDateTime.getTimeInMillis());
             
-            TripActivity activity;
+            // Create activity JSON data
+            TripActivity activity = new TripActivity();
+            activity.setTripId(tripId);
+            activity.setTitle(title);
+            activity.setDescription(description);
+            activity.setLocation(location);
+            activity.setDateTime(selectedDateTime.getTimeInMillis());
+            activity.setDayNumber(dayNumber);
+            activity.setTimeString(timeFormat.format(selectedDateTime.getTime()));
+            activity.setImageUrl(imageUrl);
+            activity.setCreatedAt(System.currentTimeMillis());
+            activity.setUpdatedAt(System.currentTimeMillis());
             
-            if (activityId == -1) {
-                // Create new activity
-                Log.d(TAG, "Creating new activity");
-                activity = new TripActivity(tripId, title, description, selectedDateTime.getTimeInMillis(), dayNumber);
-                // Set additional timestamps
-                long currentTime = System.currentTimeMillis();
-                activity.setCreatedAt(currentTime);
-                activity.setUpdatedAt(currentTime);
-            } else {
-                // Update existing activity
-                Log.d(TAG, "Updating existing activity with ID: " + activityId);
-                if (currentActivity == null) {
-                    Log.e(TAG, "Current activity is null for update operation");
-                    runOnUiThread(() -> {
-                        if (!isFinishing() && !isDestroyed()) {
-                            setLoadingState(false);
-                            btnSaveActivity.setTag(null); // Reset flag
-                            Toast.makeText(AddActivityActivity.this, "Error: Activity data not found", Toast.LENGTH_SHORT).show();
+            if (activityId != -1) {
+                activity.setId(activityId);
+            }
+            
+            UserManager userManager = UserManager.getInstance(this);
+            
+            if (userManager.isLoggedIn()) {
+                // FIREBASE-ONLY MODE: For logged-in users, save directly to Firebase only
+                Log.d(TAG, "User logged in - saving DIRECTLY to Firebase (no local database)");
+                
+                DataSyncService syncService = new DataSyncService(AddActivityActivity.this);
+                syncService.saveActivityAsJson(activity, currentTrip, new DataSyncService.OnActivitySaveListener() {
+                    @Override
+                    public void onSuccess(String firebaseId) {
+                        Log.d(TAG, "✓ Activity saved to Firebase JSON with ID: " + firebaseId);
+                        activity.setFirebaseId(firebaseId);
+                        
+                        // CRITICAL FIX: Add small delay to ensure Firebase data is propagated
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            // Show success dialog for Firebase-only save
+                            showSuccessDialogAfterAllSaves();
+                        }, 300); // 300ms delay to ensure Firebase propagation
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "*** ERROR: Firebase save failed: " + error);
+                        
+                        try {
+                            if (!isFinishing() && !isDestroyed()) {
+                                runOnUiThread(() -> {
+                                    try {
+                                        if (!isFinishing() && !isDestroyed()) {
+                                            setLoadingState(false);
+                                            btnSaveActivity.setTag(null);
+                                            
+                                            String userMessage = "Failed to save activity to cloud";
+                                            if (error.contains("timeout") || error.contains("network")) {
+                                                userMessage = "Network error - please try again";
+                                            }
+                                            
+                                            Toast.makeText(AddActivityActivity.this, userMessage, Toast.LENGTH_LONG).show();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error in Firebase error UI update", e);
+                                        btnSaveActivity.setTag(null);
+                                    }
+                                });
+                            } else {
+                                btnSaveActivity.setTag(null);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error in Firebase error handling", e);
+                            btnSaveActivity.setTag(null);
                         }
-                    });
+                    }
+                });
+                
+            } else {
+                // OFFLINE MODE: For offline users, save to local database only
+                Log.d(TAG, "User offline - saving to local database only");
+                
+                TripRepository repository = TripRepository.getInstance(this);
+                if (repository == null) {
+                    Log.e(TAG, "Repository is null!");
+                    btnSaveActivity.setTag(null);
+                    setLoadingState(false);
+                    Toast.makeText(this, "Database error - please try again", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                activity = currentActivity;
-                activity.setTitle(title);
-                activity.setDescription(description);
-                activity.setDateTime(selectedDateTime.getTimeInMillis());
-                activity.setDayNumber(dayNumber);
-                activity.setUpdatedAt(System.currentTimeMillis());
-            }
-            
-            activity.setLocation(location);
-            if (imageUrl != null && !imageUrl.trim().isEmpty()) {
-                activity.setImageUrl(imageUrl);
-                Log.d(TAG, "Set image URL: " + imageUrl);
-            }
-            
-            // Enhanced error handling with timeout protection and activity state checks
-            TripRepository.OnActivityOperationListener listener = new TripRepository.OnActivityOperationListener() {
-                @Override
-                public void onSuccess(int savedActivityId) {
-                    Log.d(TAG, "Activity saved successfully with ID: " + savedActivityId);
-                    try {
-                        // CRITICAL FIX: Always check activity state before UI operations
-                        if (!isFinishing() && !isDestroyed()) {
-                            runOnUiThread(() -> {
-                                try {
-                                    if (!isFinishing() && !isDestroyed()) {
-                                        setLoadingState(false);
-                                        btnSaveActivity.setTag(null); // Reset flag
-                                        Toast.makeText(AddActivityActivity.this, "Activity saved successfully!", Toast.LENGTH_SHORT).show();
-                                        // Set RESULT_OK to trigger refresh in TripDetailActivity
-                                        setResult(RESULT_OK);
-                                        finish();
-                                    }
-                                } catch (Exception e) {
-                                    Log.e(TAG, "Error in success UI update", e);
-                                    // Still finish the activity to prevent hanging
-                                    btnSaveActivity.setTag(null); // Reset flag
-                                    if (!isFinishing()) {
-                                        setResult(RESULT_OK); // Still indicate success
-                                        finish();
-                                    }
-                                }
-                            });
-                        } else {
-                            Log.w(TAG, "Activity finishing/destroyed during success callback");
-                            // Still set result if possible
-                            try {
-                                btnSaveActivity.setTag(null); // Reset flag
-                                setResult(RESULT_OK);
-                            } catch (Exception ignored) {}
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error running on UI thread in success", e);
-                        try {
-                            btnSaveActivity.setTag(null); // Reset flag
-                            setResult(RESULT_OK); // Ensure success is indicated
-                            if (!isFinishing()) {
-                                finish(); // Ensure activity closes
-                            }
-                        } catch (Exception ignored) {}
-                    }
-                }
                 
-                @Override
-                public void onError(String error) {
-                    Log.e(TAG, "Activity save failed: " + error);
-                    try {
-                        if (!isFinishing() && !isDestroyed()) {
-                            runOnUiThread(() -> {
-                                try {
-                                    if (!isFinishing() && !isDestroyed()) {
-                                        setLoadingState(false);
-                                        btnSaveActivity.setTag(null); // Reset flag
-                                        String userMessage = "Failed to save activity";
-                                        if (error.contains("timeout") || error.contains("network")) {
-                                            userMessage = "Network issue - activity may be saved locally";
-                                        }
-                                        Toast.makeText(AddActivityActivity.this, userMessage, Toast.LENGTH_SHORT).show();
-                                    }
-                                } catch (Exception e) {
-                                    Log.e(TAG, "Error in error UI update", e);
-                                    btnSaveActivity.setTag(null); // Reset flag
-                                }
-                            });
-                        } else {
-                            btnSaveActivity.setTag(null); // Reset flag
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error running on UI thread in error", e);
-                        btnSaveActivity.setTag(null); // Reset flag
+                TripRepository.OnActivityOperationListener localListener = new TripRepository.OnActivityOperationListener() {
+                    @Override
+                    public void onSuccess(int savedActivityId) {
+                        Log.d(TAG, "✓ Activity saved to local database with ID: " + savedActivityId);
+                        activity.setId(savedActivityId);
+                        showSuccessDialogAfterAllSaves();
                     }
+                    
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "*** ERROR: Local database save failed: " + error);
+                        
+                        try {
+                            if (!isFinishing() && !isDestroyed()) {
+                                runOnUiThread(() -> {
+                                    try {
+                                        if (!isFinishing() && !isDestroyed()) {
+                                            setLoadingState(false);
+                                            btnSaveActivity.setTag(null);
+                                            Toast.makeText(AddActivityActivity.this, "Failed to save activity locally", Toast.LENGTH_LONG).show();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error in local error UI update", e);
+                                        btnSaveActivity.setTag(null);
+                                    }
+                                });
+                            } else {
+                                btnSaveActivity.setTag(null);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error in local error handling", e);
+                            btnSaveActivity.setTag(null);
+                        }
+                    }
+                };
+                
+                // Execute the local database save
+                Log.d(TAG, "Calling repository to save activity locally");
+                if (activityId == -1) {
+                    repository.insertActivity(activity, localListener);
+                } else {
+                    repository.updateActivity(activity, localListener);
                 }
-            };
-            
-            // CRITICAL FIX: Use repository directly instead of ViewModel to avoid LiveData observer leaks
-            Log.d(TAG, "About to call repository insert/update directly");
-            TripRepository repository = TripRepository.getInstance(this);
-            if (activityId == -1) {
-                repository.insertActivity(activity, listener);
-            } else {
-                repository.updateActivity(activity, listener);
             }
             
         } catch (Exception e) {
             Log.e(TAG, "CRITICAL: Exception in saveActivityToDatabase", e);
+            e.printStackTrace(); // Print full stack trace
             btnSaveActivity.setTag(null); // Reset flag
             if (!isFinishing() && !isDestroyed()) {
                 runOnUiThread(() -> {
                     try {
                         if (!isFinishing() && !isDestroyed()) {
                             setLoadingState(false);
-                            Toast.makeText(AddActivityActivity.this, "Critical error saving activity", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(AddActivityActivity.this, "Critical error saving activity: " + e.getMessage(), Toast.LENGTH_LONG).show();
                         }
                     } catch (Exception uiError) {
                         Log.e(TAG, "Error showing critical error message", uiError);
@@ -793,6 +821,97 @@ public class AddActivityActivity extends AppCompatActivity {
         }
     }
     
+    /**
+     * Show success dialog after all database operations complete
+     */
+    private void showSuccessDialogAfterAllSaves() {
+        try {
+            if (!isFinishing() && !isDestroyed()) {
+                // Add small delay to ensure all database operations are truly complete
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    try {
+                        if (!isFinishing() && !isDestroyed()) {
+                            setLoadingState(false);
+                            btnSaveActivity.setTag(null);
+                            
+                            String message = activityId == -1 ? 
+                                getString(R.string.activity_created_successfully) : 
+                                getString(R.string.activity_updated_successfully);
+                            
+                            SuccessDialogHelper.showSuccessDialog(
+                                AddActivityActivity.this,
+                                message,
+                                () -> {
+                                    // CRITICAL FIX: Ensure result triggers immediate refresh
+                                    setResult(RESULT_OK);
+                                    
+                                    // Add small delay before finishing to ensure stable transition
+                                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                        if (!isFinishing() && !isDestroyed()) {
+                                            finish();
+                                        }
+                                    }, 150); // 150ms delay for stable transition
+                                }
+                            );
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error showing success dialog", e);
+                        setResult(RESULT_OK);
+                        if (!isFinishing() && !isDestroyed()) {
+                            finish();
+                        }
+                    }
+                }, 200); // 200ms delay to ensure database operations complete
+            } else {
+                setResult(RESULT_OK);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in showSuccessDialogAfterAllSaves", e);
+            setResult(RESULT_OK);
+            if (!isFinishing() && !isDestroyed()) {
+                finish();
+            }
+        }
+    }
+    
+    private void checkFirebaseStatus() {
+        try {
+            UserManager userManager = UserManager.getInstance(this);
+            Log.d(TAG, "=== FIREBASE STATUS CHECK ===");
+            Log.d(TAG, "User logged in: " + (userManager != null ? userManager.isLoggedIn() : "UserManager is null"));
+            
+            if (userManager != null && userManager.isLoggedIn()) {
+                Log.d(TAG, "User email: " + userManager.getUserEmail());
+                Log.d(TAG, "User name: " + userManager.getUserName());
+                
+                // Check trip Firebase sync status
+                if (currentTrip != null) {
+                    Log.d(TAG, "Current trip Firebase ID: " + currentTrip.getFirebaseId());
+                    Log.d(TAG, "Trip synced to Firebase: " + (currentTrip.getFirebaseId() != null && !currentTrip.getFirebaseId().isEmpty()));
+                } else {
+                    Log.w(TAG, "Current trip is null for Firebase status check");
+                }
+            } else {
+                Log.d(TAG, "User not logged in - will save locally only");
+            }
+            
+            // Check network connectivity
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                android.net.NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                boolean isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
+                Log.d(TAG, "Network connected: " + isConnected);
+                if (activeNetwork != null) {
+                    Log.d(TAG, "Network type: " + activeNetwork.getTypeName());
+                }
+            }
+            
+            Log.d(TAG, "=== END FIREBASE STATUS ===");
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking Firebase status", e);
+        }
+    }
+
     private void setLoadingState(boolean loading) {
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         btnSaveActivity.setEnabled(!loading);
@@ -831,6 +950,9 @@ public class AddActivityActivity extends AppCompatActivity {
         
         // CRITICAL FIX: Clean up all resources to prevent memory leaks and crashes
         try {
+            // Release MediaPlayer resources
+            SuccessDialogHelper.releaseMediaPlayer();
+            
             // Clear any pending Glide operations
             if (!isDestroyed()) {
                 Glide.with(this).clear(imagePreview);
