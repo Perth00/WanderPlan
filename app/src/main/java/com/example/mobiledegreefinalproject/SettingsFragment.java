@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -185,7 +186,7 @@ public class SettingsFragment extends Fragment {
                 int padding = (int) (16 * getResources().getDisplayMetrics().density); // 16dp padding
                 profileImage.setPadding(padding, padding, padding, padding);
                 profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(
-                    requireContext().getColor(R.color.primary)));
+                    getThemeColor(com.google.android.material.R.attr.colorPrimary)));
                 profileImage.setImageResource(R.drawable.ic_person);
             }
         } catch (Exception e) {
@@ -197,7 +198,7 @@ public class SettingsFragment extends Fragment {
                     profileImage.setPadding(padding, padding, padding, padding);
                     profileImage.setImageResource(R.drawable.ic_person);
                     profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(
-                        requireContext().getColor(R.color.primary)));
+                        getThemeColor(com.google.android.material.R.attr.colorPrimary)));
                 }
             } catch (Exception e2) {
                 android.util.Log.e("SettingsFragment", "Error in fallback image loading", e2);
@@ -205,6 +206,12 @@ public class SettingsFragment extends Fragment {
         }
     }
     
+    private int getThemeColor(int attr) {
+        android.util.TypedValue typedValue = new android.util.TypedValue();
+        requireContext().getTheme().resolveAttribute(attr, typedValue, true);
+        return typedValue.data;
+    }
+
     private void updateAuthenticationOptions() {
         try {
             if (userManager == null) return;
@@ -288,26 +295,92 @@ public class SettingsFragment extends Fragment {
     }
     
     private void showThemeSelectionDialog() {
-        try {
-            if (getContext() == null) return;
-            
-            String[] themes = {"Light Theme", "Dark Theme", "System Default"};
-            
-            new AlertDialog.Builder(getContext())
-                    .setTitle("Select Theme")
-                    .setItems(themes, (dialog, which) -> {
-                        String selectedTheme = themes[which];
-                        if (getContext() != null) {
-                            Toast.makeText(getContext(), 
-                                selectedTheme + " selected! (Feature coming soon)", 
-                                Toast.LENGTH_LONG).show();
-                        }
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-        } catch (Exception e) {
-            android.util.Log.e("SettingsFragment", "Error showing theme dialog", e);
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        LayoutInflater inflater = requireActivity().getLayoutInflater();
+        View dialogView = inflater.inflate(R.layout.dialog_theme_selection, null);
+        builder.setView(dialogView);
+
+        RadioGroup uiModeRadioGroup = dialogView.findViewById(R.id.rg_ui_mode);
+        RadioGroup colorRadioGroup = dialogView.findViewById(R.id.rg_color_theme);
+
+        // Set current theme
+        String currentTheme = ThemeManager.getTheme(requireContext());
+        if (currentTheme.equals(ThemeManager.THEME_LIGHT)) {
+            uiModeRadioGroup.check(R.id.rb_light);
+        } else if (currentTheme.equals(ThemeManager.THEME_DARK)) {
+            uiModeRadioGroup.check(R.id.rb_dark);
+        } else {
+            uiModeRadioGroup.check(R.id.rb_system);
         }
+
+        String currentColorTheme = ThemeManager.getColorTheme(requireContext());
+        switch (currentColorTheme) {
+            case ThemeManager.THEME_PASTEL_PINK:
+                colorRadioGroup.check(R.id.rb_pink);
+                break;
+            case ThemeManager.THEME_FOREST_GREEN:
+                colorRadioGroup.check(R.id.rb_green);
+                break;
+            case ThemeManager.THEME_RED:
+                colorRadioGroup.check(R.id.rb_red);
+                break;
+            case ThemeManager.THEME_BLUE:
+                colorRadioGroup.check(R.id.rb_blue);
+                break;
+            case ThemeManager.THEME_LIGHT_BLUE:
+                colorRadioGroup.check(R.id.rb_light_blue);
+                break;
+            case ThemeManager.THEME_SUNSET_ORANGE:
+                colorRadioGroup.check(R.id.radio_sunset_orange);
+                break;
+            case ThemeManager.THEME_DEEP_PURPLE:
+                colorRadioGroup.check(R.id.radio_deep_purple);
+                break;
+            case ThemeManager.THEME_MODERN_TEAL:
+                colorRadioGroup.check(R.id.radio_modern_teal);
+                break;
+        }
+
+        AlertDialog dialog = builder.create();
+
+        uiModeRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            String selectedTheme = ThemeManager.THEME_SYSTEM; // Default
+            if (checkedId == R.id.rb_light) {
+                selectedTheme = ThemeManager.THEME_LIGHT;
+            } else if (checkedId == R.id.rb_dark) {
+                selectedTheme = ThemeManager.THEME_DARK;
+            }
+            ThemeManager.setTheme(requireContext(), selectedTheme);
+            dialog.dismiss();
+            requireActivity().recreate();
+        });
+
+        colorRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            String selectedColorTheme = ThemeManager.THEME_PASTEL_PINK; // Default
+            if (checkedId == R.id.rb_pink) {
+                selectedColorTheme = ThemeManager.THEME_PASTEL_PINK;
+            } else if (checkedId == R.id.rb_green) {
+                selectedColorTheme = ThemeManager.THEME_FOREST_GREEN;
+            } else if (checkedId == R.id.rb_red) {
+                selectedColorTheme = ThemeManager.THEME_RED;
+            } else if (checkedId == R.id.rb_blue) {
+                selectedColorTheme = ThemeManager.THEME_BLUE;
+            } else if (checkedId == R.id.rb_light_blue) {
+                selectedColorTheme = ThemeManager.THEME_LIGHT_BLUE;
+            } else if (checkedId == R.id.radio_sunset_orange) {
+                selectedColorTheme = ThemeManager.THEME_SUNSET_ORANGE;
+            } else if (checkedId == R.id.radio_deep_purple) {
+                selectedColorTheme = ThemeManager.THEME_DEEP_PURPLE;
+            } else if (checkedId == R.id.radio_modern_teal) {
+                selectedColorTheme = ThemeManager.THEME_MODERN_TEAL;
+            }
+            ThemeManager.setColorTheme(requireContext(), selectedColorTheme);
+            dialog.dismiss();
+            requireActivity().recreate();
+        });
+
+
+        dialog.show();
     }
     
     private void showSyncSettingsDialog() {

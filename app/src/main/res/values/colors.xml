@@ -49,4 +49,62 @@
     <color name="text_primary">#2C2C2C</color>
     <color name="text_secondary">#9E9E9E</color>
     <color name="card_stroke_color">#E0E0E0</color>
+
+    <!-- Theme Color Palettes -->
+    
+    <!-- Pastel Pink Theme -->
+    <color name="pastel_pink_primary">@color/pastel_pink</color>
+    <color name="pastel_pink_primary_variant">@color/primary_variant</color>
+    <color name="pastel_pink_primary_light">@color/primary_light</color>
+    <color name="pastel_pink_secondary">@color/sky_blue</color>
+    <color name="pastel_pink_secondary_variant">@color/secondary_variant</color>
+    
+    <!-- Forest Green Theme -->
+    <color name="forest_green_primary">#4CAF50</color>
+    <color name="forest_green_primary_variant">#388E3C</color>
+    <color name="forest_green_primary_light">#C8E6C9</color>
+    <color name="forest_green_secondary">#FFC107</color>
+    <color name="forest_green_secondary_variant">#FFA000</color>
+    
+    <!-- Red Theme -->
+    <color name="red_primary">#F44336</color>
+    <color name="red_primary_variant">#D32F2F</color>
+    <color name="red_primary_light">#FFCDD2</color>
+    <color name="red_secondary">#2196F3</color>
+    <color name="red_secondary_variant">#1976D2</color>
+    
+    <!-- Blue Theme -->
+    <color name="blue_primary">#2196F3</color>
+    <color name="blue_primary_variant">#1976D2</color>
+    <color name="blue_primary_light">#BBDEFB</color>
+    <color name="blue_secondary">#FF9800</color>
+    <color name="blue_secondary_variant">#F57C00</color>
+    
+    <!-- Light Blue Theme -->
+    <color name="light_blue_primary">#03A9F4</color>
+    <color name="light_blue_primary_variant">#0288D1</color>
+    <color name="light_blue_primary_light">#B3E5FC</color>
+    <color name="light_blue_secondary">#FFC107</color>
+    <color name="light_blue_secondary_variant">#FFA000</color>
+    
+    <!-- Sunset Orange Theme -->
+    <color name="sunset_orange_primary">#FF7043</color>
+    <color name="sunset_orange_primary_variant">#F4511E</color>
+    <color name="sunset_orange_primary_light">#FFCCBC</color>
+    <color name="sunset_orange_secondary">#42A5F5</color>
+    <color name="sunset_orange_secondary_variant">#1E88E5</color>
+    
+    <!-- Deep Purple Theme -->
+    <color name="deep_purple_primary">#7E57C2</color>
+    <color name="deep_purple_primary_variant">#5E35B1</color>
+    <color name="deep_purple_primary_light">#D1C4E9</color>
+    <color name="deep_purple_secondary">#FFCA28</color>
+    <color name="deep_purple_secondary_variant">#FFB300</color>
+    
+    <!-- Modern Teal Theme -->
+    <color name="modern_teal_primary">#26A69A</color>
+    <color name="modern_teal_primary_variant">#00897B</color>
+    <color name="modern_teal_primary_light">#B2DFDB</color>
+    <color name="modern_teal_secondary">#FF7043</color>
+    <color name="modern_teal_secondary_variant">#F4511E</color>
 </resources>

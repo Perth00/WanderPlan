@@ -11,7 +11,6 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.mobiledegreefinalproject.database.Trip;
@@ -22,7 +21,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 
-public class AddTripActivity extends AppCompatActivity {
+public class AddTripActivity extends BaseActivity {
     
     private static final String TAG = "AddTripActivity";
     

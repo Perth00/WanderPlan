@@ -79,7 +79,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Edit profile"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -107,7 +107,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="@string/theme"
                     android:src="@drawable/ic_settings"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -121,7 +121,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Change theme"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -130,7 +130,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginHorizontal="16dp"
-                android:background="@color/light_grey" />
+                android:background="?android:attr/dividerHorizontal" />
 
             <!-- Data Sync -->
             <LinearLayout
@@ -148,7 +148,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="Data Sync"
                     android:src="@drawable/ic_settings"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -162,7 +162,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Sync settings"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -171,7 +171,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginHorizontal="16dp"
-                android:background="@color/light_grey" />
+                android:background="?android:attr/dividerHorizontal" />
 
             <!-- Feedback -->
             <LinearLayout
@@ -189,7 +189,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="@string/feedback"
                     android:src="@drawable/ic_home"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -203,7 +203,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Send feedback"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -212,7 +212,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginHorizontal="16dp"
-                android:background="@color/light_grey" />
+                android:background="?android:attr/dividerHorizontal" />
 
             <!-- About -->
             <LinearLayout
@@ -230,7 +230,7 @@
                     android:layout_marginEnd="16dp"
                     android:contentDescription="@string/about"
                     android:src="@drawable/ic_trips"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
@@ -244,7 +244,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="About app"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -253,7 +253,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginHorizontal="16dp"
-                android:background="@color/light_grey" />
+                android:background="?android:attr/dividerHorizontal" />
 
             <!-- Login -->
             <LinearLayout
@@ -269,23 +269,23 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_marginEnd="16dp"
-                    android:contentDescription="Login"
-                    android:src="@drawable/ic_lock"
-                    app:tint="@color/primary" />
+                    android:contentDescription="@string/login"
+                    android:src="@drawable/ic_person"
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Login" />
+                    android:text="@string/login" />
 
                 <ImageView
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:contentDescription="Go to login"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -294,7 +294,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginHorizontal="16dp"
-                android:background="@color/light_grey" />
+                android:background="?android:attr/dividerHorizontal" />
 
             <!-- Register -->
             <LinearLayout
@@ -310,23 +310,23 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_marginEnd="16dp"
-                    android:contentDescription="Register"
+                    android:contentDescription="@string/register"
                     android:src="@drawable/ic_person"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     style="@style/WanderPlan.Text.Body"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Create Account" />
+                    android:text="@string/register" />
 
                 <ImageView
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:contentDescription="Go to register"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -336,7 +336,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginHorizontal="16dp"
-                android:background="@color/light_grey"
+                android:background="?android:attr/dividerHorizontal"
                 android:visibility="gone" />
 
             <!-- Logout -->
@@ -354,7 +354,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_marginEnd="16dp"
-                    android:contentDescription="Logout"
+                    android:contentDescription="@string/logout"
                     android:src="@drawable/ic_arrow_back"
                     app:tint="@color/error" />
 
@@ -363,15 +363,8 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Sign Out"
+                    android:text="@string/logout"
                     android:textColor="@color/error" />
-
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:contentDescription="Sign out"
-                    android:src="@drawable/ic_add"
-                    app:tint="@color/error" />
 
             </LinearLayout>
 

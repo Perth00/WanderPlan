@@ -51,7 +51,8 @@
                         android:id="@+id/layout_trip_selector"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_button_primary"
+                        android:background="@drawable/bg_rounded_card"
+                        android:backgroundTint="?attr/colorPrimary"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
@@ -65,7 +66,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="🌟 All Trips Budget"
-                            android:textColor="@color/white"
+                            android:textColor="?attr/colorOnPrimary"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -75,7 +76,7 @@
                             android:layout_marginStart="8dp"
                             android:src="@drawable/ic_arrow_back"
                             android:rotation="270"
-                            app:tint="@color/white" />
+                            app:tint="?attr/colorOnPrimary" />
 
                     </LinearLayout>
 
@@ -124,7 +125,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
                                 android:text="RM2000.00"
-                                android:textColor="@color/primary" />
+                                android:textColor="?attr/colorPrimary" />
 
                         </LinearLayout>
 
@@ -139,7 +140,7 @@
                             android:contentDescription="Edit budget"
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:padding="2dp"
-                            app:tint="@color/medium_grey"
+                            app:tint="?attr/colorOnSurface"
                             android:visibility="visible" />
 
                     </RelativeLayout>

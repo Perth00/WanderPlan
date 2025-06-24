@@ -62,10 +62,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
-                android:textColor="@color/primary"
+                android:textColor="?attr/colorPrimary"
                 android:textStyle="bold"
                 android:background="@drawable/bg_rounded_card"
-                android:backgroundTint="@color/primary_light"
+                android:backgroundTint="?attr/colorPrimaryLight"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="4dp"
                 android:layout_marginEnd="8dp"
@@ -78,7 +78,7 @@
                 android:src="@drawable/ic_edit"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/edit_trip"
-                app:tint="@color/text_secondary"
+                app:tint="?attr/colorOnSurface"
                 android:layout_marginEnd="8dp"/>
 
             <ImageButton
@@ -102,6 +102,7 @@
             android:textColor="@color/text_secondary"
             android:layout_marginBottom="12dp"
             android:drawableStart="@drawable/ic_budget"
+            android:drawableTint="?attr/colorPrimary"
             android:drawablePadding="6dp"
             android:gravity="center_vertical"
             tools:text="Dec 15, 2024 - Dec 22, 2024" />

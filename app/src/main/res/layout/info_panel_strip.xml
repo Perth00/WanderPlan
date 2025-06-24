@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@color/background_light">
+    android:background="@android:color/transparent">
 
     <!-- Clickable Info Strip -->
     <LinearLayout
@@ -13,6 +13,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="@drawable/bg_rounded_card"
+        android:backgroundTint="?attr/colorPrimaryLight"
         android:layout_marginHorizontal="16dp"
         android:layout_marginVertical="6dp"
         android:paddingHorizontal="16dp"
@@ -24,10 +25,11 @@
 
         <!-- Info Icon -->
         <ImageView
+            android:id="@+id/iv_info_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:src="@drawable/ic_settings"
-            app:tint="@color/primary"
+            app:tint="?attr/colorPrimary"
             android:layout_gravity="center_vertical"
             android:contentDescription="Info icon" />
 
@@ -40,7 +42,7 @@
             android:layout_marginStart="12dp"
             android:text="💡 Tap for tips and sync info"
             android:textSize="15sp"
-            android:textColor="@color/primary"
+            android:textColor="?attr/colorPrimary"
             android:textStyle="bold"
             android:layout_gravity="center_vertical" />
 
@@ -50,7 +52,7 @@
             android:layout_width="18dp"
             android:layout_height="18dp"
             android:src="@drawable/ic_arrow_back"
-            app:tint="@color/primary"
+            app:tint="?attr/colorPrimary"
             android:layout_gravity="center_vertical"
             android:rotation="270"
             android:contentDescription="Expand/Collapse" />
@@ -78,7 +80,7 @@
             android:layout_height="wrap_content"
             android:text="🗺️ Long press a trip in 'My Trips' to delete it\n🏠 Home shows upcoming trips (view-only)\n🔄 Sync requires a registered account"
             android:textSize="14sp"
-            android:textColor="@color/primary"
+            android:textColor="?attr/colorOnSurface"
             android:lineSpacingExtra="4dp"
             android:layout_marginBottom="12dp"
             android:fontFamily="sans-serif"
@@ -91,7 +93,7 @@
             android:layout_height="wrap_content"
             android:text="🎯 Long press an activity to delete it\n🔄 New activities may need a refresh to appear\n☁️ All changes sync automatically with your account"
             android:textSize="14sp"
-            android:textColor="@color/primary"
+            android:textColor="?attr/colorOnSurface"
             android:lineSpacingExtra="4dp"
             android:layout_marginBottom="12dp"
             android:fontFamily="sans-serif"
@@ -117,7 +119,20 @@
             android:layout_height="wrap_content"
             android:text="💡 Tip: Create an account to sync your trips across devices"
             android:textSize="14sp"
-            android:textColor="@color/primary"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="sans-serif"
+            android:visibility="gone" />
+        
+        <!-- Custom Message -->
+        <TextView
+            android:id="@+id/tv_custom_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="This is a custom message"
+            android:textSize="14sp"
+            android:textColor="?attr/colorOnSurface"
+            android:lineSpacingExtra="4dp"
+            android:layout_marginBottom="12dp"
             android:fontFamily="sans-serif"
             android:visibility="gone" />
 

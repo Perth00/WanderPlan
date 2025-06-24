@@ -19,8 +19,10 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.bitmap.CircleCrop;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
+import android.graphics.drawable.GradientDrawable;
+import android.util.TypedValue;
 
-public class ProfileActivity extends AppCompatActivity {
+public class ProfileActivity extends BaseActivity {
 
     private TextView profileTitle;
     private ImageView profileImage;
@@ -52,6 +54,7 @@ public class ProfileActivity extends AppCompatActivity {
         initViews();
         setupImagePicker();
         setupClickListeners();
+        applyThemeColors();
         
         userManager = UserManager.getInstance(this);
         loadUserData();
@@ -113,6 +116,23 @@ public class ProfileActivity extends AppCompatActivity {
             android.util.Log.e("ProfileActivity", "Error initializing views", e);
             throw e;
         }
+    }
+
+    private void applyThemeColors() {
+        // Create a themed drawable for the edit icon background
+        GradientDrawable gradientDrawable = new GradientDrawable();
+        gradientDrawable.setShape(GradientDrawable.OVAL);
+        gradientDrawable.setColor(getThemeColor(android.R.attr.colorPrimary));
+        editProfileImage.setBackground(gradientDrawable);
+
+        // Apply theme color to other icons
+        // Note: We need to get all the input layouts and icons to apply the theme
+    }
+
+    private int getThemeColor(int attr) {
+        TypedValue typedValue = new TypedValue();
+        getTheme().resolveAttribute(attr, typedValue, true);
+        return typedValue.data;
     }
 
     private void setupImagePicker() {
@@ -223,25 +243,12 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void loadDefaultProfileImage() {
         try {
-            // Cache buster to force reload
-            String cacheKey = "?cb=" + System.currentTimeMillis();
-            
-            Glide.with(this)
-                .load(R.drawable.ic_person)
-                .transform(new CircleCrop())
-                .placeholder(R.drawable.ic_person)
-                .error(R.drawable.ic_person)
-                .into(profileImage);
-                
-            android.util.Log.d("ProfileActivity", "Default profile image loaded");
+            profileImage.setImageResource(R.drawable.ic_person);
+            profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(
+                getThemeColor(com.google.android.material.R.attr.colorPrimary)
+            ));
         } catch (Exception e) {
             android.util.Log.e("ProfileActivity", "Error loading default profile image", e);
-            // Fallback: set image directly
-            try {
-                profileImage.setImageResource(R.drawable.ic_person);
-            } catch (Exception e2) {
-                android.util.Log.e("ProfileActivity", "Error setting fallback image", e2);
-            }
         }
     }
 

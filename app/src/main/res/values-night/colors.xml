@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Remapping for Dark Theme -->
+    <color name="navy">#E8EAF6</color> <!-- Lighter for dark theme titles -->
+    <color name="dark_grey">#F5F5F5</color> <!-- Becomes light for dark theme text -->
+    <color name="medium_grey">#BDBDBD</color>
+
+    <!-- Background Colors -->
+    <color name="background_light">#121212</color> <!-- Dark background -->
+    <color name="card_background">#1E1E1E</color>
+    <color name="surface_light">#1E1E1E</color>
+    <color name="light_grey">#333333</color> <!-- Darker dividers -->
+</resources> 

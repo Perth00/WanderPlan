@@ -228,7 +228,7 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
                 pieChart.getDescription().setEnabled(false);
                 pieChart.setDragDecelerationFrictionCoef(0.95f);
                 pieChart.setDrawHoleEnabled(true);
-                pieChart.setHoleColor(Color.WHITE);
+                pieChart.setHoleColor(getThemeColor(android.R.attr.colorBackground));
                 pieChart.setTransparentCircleRadius(61f);
                 pieChart.setHoleRadius(45f);
                 pieChart.setDrawCenterText(true);
@@ -679,8 +679,8 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
             TextView dateButton = new TextView(context);
             dateButton.setText(new SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()).format(new Date()));
             // Use ContextCompat for getting drawables and colors
-            dateButton.setBackground(ContextCompat.getDrawable(context, R.drawable.bg_button_primary));
-            dateButton.setTextColor(ContextCompat.getColor(context, R.color.white));
+            dateButton.setBackgroundColor(getThemeColor(com.google.android.material.R.attr.colorPrimary));
+            dateButton.setTextColor(getThemeColor(com.google.android.material.R.attr.colorOnPrimary));
             dateButton.setPadding(32, 16, 32, 16);
             dateButton.setClickable(true);
             
@@ -779,7 +779,9 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
         });
         
         builder.setNegativeButton("Cancel", null);
-        builder.show();
+        AlertDialog dialog = builder.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(getThemeColor(com.google.android.material.R.attr.colorPrimary));
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(getThemeColor(com.google.android.material.R.attr.colorOnSurface));
             
         } catch (Exception e) {
             Log.e(TAG, "Error creating add expense dialog", e);
@@ -930,14 +932,13 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
     }
 
     private void showErrorToast(String message) {
-        try {
-            Context context = getContext();
-            if (context != null) {
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing toast", e);
-        }
+        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+    }
+
+    private int getThemeColor(int attr) {
+        android.util.TypedValue typedValue = new android.util.TypedValue();
+        requireContext().getTheme().resolveAttribute(attr, typedValue, true);
+        return typedValue.data;
     }
 
     @Override
