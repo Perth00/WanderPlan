@@ -22,7 +22,7 @@
             android:text="Day 1"
             android:textSize="12sp"
             android:textStyle="bold"
-            android:textColor="@color/primary"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="8dp" />
 
         <!-- Timeline Dot -->
@@ -40,7 +40,7 @@
             android:id="@+id/timeline_line"
             android:layout_width="2dp"
             android:layout_height="match_parent"
-            android:background="@color/primary_light"
+            android:background="?attr/colorPrimaryLight"
             android:layout_marginBottom="16dp" />
 
     </LinearLayout>
