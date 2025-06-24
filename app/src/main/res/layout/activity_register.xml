@@ -25,7 +25,7 @@
                 android:layout_marginBottom="24dp"
                 android:contentDescription="@string/app_name"
                 android:src="@drawable/ic_trips"
-                app:tint="@color/primary" />
+                app:tint="?attr/colorPrimary" />
 
             <!-- Title Text -->
             <TextView
@@ -54,7 +54,7 @@
                 android:layout_marginBottom="16dp"
                 android:hint="Full Name"
                 app:startIconDrawable="@drawable/ic_person"
-                app:startIconTint="@color/primary">
+                app:startIconTint="?attr/colorPrimary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/name_edit_text"
@@ -74,7 +74,7 @@
                 android:layout_marginBottom="16dp"
                 android:hint="Email Address"
                 app:startIconDrawable="@drawable/ic_email"
-                app:startIconTint="@color/primary">
+                app:startIconTint="?attr/colorPrimary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/email_edit_text"
@@ -94,7 +94,7 @@
                 android:layout_marginBottom="16dp"
                 android:hint="Password"
                 app:startIconDrawable="@drawable/ic_lock"
-                app:startIconTint="@color/primary">
+                app:startIconTint="?attr/colorPrimary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/password_edit_text"
@@ -113,7 +113,7 @@
                     android:contentDescription="Toggle password visibility"
                     android:padding="4dp"
                     android:src="@drawable/ic_visibility_off"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorPrimary" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -126,7 +126,7 @@
                 android:layout_marginBottom="32dp"
                 android:hint="Confirm Password"
                 app:startIconDrawable="@drawable/ic_lock"
-                app:startIconTint="@color/primary">
+                app:startIconTint="?attr/colorPrimary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/confirm_password_edit_text"
@@ -145,7 +145,7 @@
                     android:contentDescription="Toggle password visibility"
                     android:padding="4dp"
                     android:src="@drawable/ic_visibility_off"
-                    app:tint="@color/medium_grey" />
+                    app:tint="?attr/colorPrimary" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -191,7 +191,7 @@
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:padding="4dp"
                     android:text="Login here"
-                    android:textColor="@color/primary"
+                    android:textColor="?attr/colorPrimary"
                     android:textStyle="bold" />
 
             </LinearLayout>

@@ -8,6 +8,7 @@ import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.util.TypedValue;
 
 /**
  * Manager for handling the expandable info panel that provides
@@ -141,6 +142,12 @@ public class InfoPanelManager {
         updateInfoStripText("💡 Tap for tips and sync info");
     }
     
+    private int getThemeColor(int attr) {
+        TypedValue typedValue = new TypedValue();
+        context.getTheme().resolveAttribute(attr, typedValue, true);
+        return typedValue.data;
+    }
+
     private void updateInfoStripText(String text) {
         if (infoStripText != null) {
             infoStripText.setText(text);
@@ -160,7 +167,7 @@ public class InfoPanelManager {
             
             // Set proper color for trip tips
             try {
-                tripTips.setTextColor(context.getResources().getColor(R.color.primary, context.getTheme()));
+                tripTips.setTextColor(getThemeColor(com.google.android.material.R.attr.colorPrimary));
             } catch (Exception e) {
                 android.util.Log.w(TAG, "Error setting trip tips color", e);
                 // Fallback to default
@@ -182,7 +189,7 @@ public class InfoPanelManager {
             
             // Set proper color for activity tips
             try {
-                activityTips.setTextColor(context.getResources().getColor(R.color.primary, context.getTheme()));
+                activityTips.setTextColor(getThemeColor(com.google.android.material.R.attr.colorPrimary));
             } catch (Exception e) {
                 android.util.Log.w(TAG, "Error setting activity tips color", e);
                 // Fallback to default
@@ -218,7 +225,7 @@ public class InfoPanelManager {
             
             // Set proper color for tips - using primary blue like other panels
             try {
-                generalTips.setTextColor(context.getResources().getColor(R.color.primary, context.getTheme()));
+                generalTips.setTextColor(getThemeColor(com.google.android.material.R.attr.colorPrimary));
             } catch (Exception e) {
                 android.util.Log.w(TAG, "Error setting general tip color", e);
                 // Fallback to default
@@ -238,8 +245,11 @@ public class InfoPanelManager {
             
             // Set color based on importance - use primary blue for consistency, except warnings
             try {
-                int colorRes = isImportant ? R.color.warning : R.color.primary;
-                generalTips.setTextColor(context.getResources().getColor(colorRes, context.getTheme()));
+                if (isImportant) {
+                    generalTips.setTextColor(context.getResources().getColor(R.color.warning, context.getTheme()));
+                } else {
+                    generalTips.setTextColor(getThemeColor(com.google.android.material.R.attr.colorPrimary));
+                }
             } catch (Exception e) {
                 android.util.Log.w(TAG, "Error setting custom message color", e);
                 // Fallback to default

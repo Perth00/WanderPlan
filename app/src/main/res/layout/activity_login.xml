@@ -25,7 +25,7 @@
                 android:layout_marginBottom="24dp"
                 android:contentDescription="@string/app_name"
                 android:src="@drawable/ic_trips"
-                app:tint="@color/primary" />
+                app:tint="?attr/colorPrimary" />
 
             <!-- Welcome Text -->
             <TextView
@@ -54,7 +54,7 @@
                 android:layout_marginBottom="16dp"
                 android:hint="Email Address"
                 app:startIconDrawable="@drawable/ic_email"
-                app:startIconTint="@color/primary">
+                app:startIconTint="?attr/colorPrimary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/email_edit_text"
@@ -74,7 +74,7 @@
                 android:layout_marginBottom="8dp"
                 android:hint="Password"
                 app:startIconDrawable="@drawable/ic_lock"
-                app:startIconTint="@color/primary">
+                app:startIconTint="?attr/colorPrimary">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/password_edit_text"
@@ -108,7 +108,7 @@
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:padding="8dp"
                 android:text="Forgot Password?"
-                android:textColor="@color/primary"
+                android:textColor="?attr/colorPrimary"
                 android:textStyle="bold" />
 
             <!-- Login Button -->
@@ -144,7 +144,7 @@
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:padding="4dp"
                     android:text="Register here"
-                    android:textColor="@color/primary"
+                    android:textColor="?attr/colorPrimary"
                     android:textStyle="bold" />
 
             </LinearLayout>

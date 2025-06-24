@@ -65,7 +65,7 @@
                         android:drawableStart="@drawable/ic_budget"
                         android:drawablePadding="10dp"
                         android:gravity="center_vertical"
-                        app:drawableTint="@color/primary" />
+                        app:drawableTint="?attr/colorPrimary" />
 
                 </LinearLayout>
 

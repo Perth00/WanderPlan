@@ -1,0 +1,9 @@
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Toggle password visibility"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_visibility_off"
+                    app:tint="?attr/colorPrimary" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Forgot Password Link --> 

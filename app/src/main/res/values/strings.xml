@@ -138,4 +138,5 @@
     <string name="activity_created_successfully">Activity created successfully!</string>
     <string name="activity_updated_successfully">Activity updated successfully!</string>
     <string name="trip_updated_successfully">Trip updated successfully!</string>
+    <string name="logout">Sign Out</string>
 </resources>

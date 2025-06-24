@@ -64,7 +64,7 @@
                     android:contentDescription="Edit profile picture"
                     android:padding="8dp"
                     android:src="@drawable/ic_add"
-                    app:tint="@color/white" />
+                    app:tint="?attr/colorOnPrimary" />
 
             </FrameLayout>
 
@@ -100,7 +100,7 @@
                     android:layout_marginBottom="16dp"
                     android:hint="Full Name"
                     app:startIconDrawable="@drawable/ic_person"
-                    app:startIconTint="@color/primary">
+                    app:startIconTint="?attr/colorPrimary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/name_edit_text"
@@ -125,7 +125,7 @@
                         android:layout_marginEnd="12dp"
                         android:contentDescription="Email"
                         android:src="@drawable/ic_email"
-                        app:tint="@color/primary" />
+                        app:tint="?attr/colorPrimary" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -166,7 +166,7 @@
                         android:layout_marginEnd="12dp"
                         android:contentDescription="Account type"
                         android:src="@drawable/ic_settings"
-                        app:tint="@color/primary" />
+                        app:tint="?attr/colorPrimary" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -239,11 +239,12 @@
 
         <!-- Guest Mode Info -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/guest_mode_info"
             style="@style/WanderPlan.Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:backgroundTint="@color/primary_light">
+            app:cardBackgroundColor="?attr/colorPrimaryLight">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -251,13 +252,20 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="12dp"
+                    android:src="@drawable/ic_budget"
+                    app:tint="?attr/colorPrimary" />
+
                 <TextView
                     style="@style/WanderPlan.Text.Body"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
                     android:text="💡 Pro Tip"
-                    android:textColor="@color/primary"
+                    android:textColor="?attr/colorPrimary"
                     android:textStyle="bold" />
 
                 <TextView
