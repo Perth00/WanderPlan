@@ -40,6 +40,10 @@ public class AddTripActivity extends AppCompatActivity {
     private Calendar endCalendar;
     private SimpleDateFormat dateFormat;
     
+    private boolean isEditMode = false;
+    private Trip currentTrip = null;
+    private int tripId = -1;
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,6 +54,15 @@ public class AddTripActivity extends AppCompatActivity {
         setupDatePickers();
         setupClickListeners();
         setupToolbar();
+        
+        // Check if we are in edit mode
+        if (getIntent().hasExtra("trip_id")) {
+            tripId = getIntent().getIntExtra("trip_id", -1);
+            if (tripId != -1) {
+                isEditMode = true;
+                loadTripData();
+            }
+        }
         
         // Test database connectivity
         testDatabaseConnection();
@@ -90,7 +103,11 @@ public class AddTripActivity extends AppCompatActivity {
     private void setupToolbar() {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Add New Trip");
+            if (isEditMode) {
+                getSupportActionBar().setTitle(R.string.edit_trip);
+            } else {
+                getSupportActionBar().setTitle("Add New Trip");
+            }
         }
     }
     
@@ -146,6 +163,31 @@ public class AddTripActivity extends AppCompatActivity {
         textEndDate.setText(dateFormat.format(endCalendar.getTime()));
     }
     
+    private void loadTripData() {
+        viewModel.getTripById(tripId).observe(this, trip -> {
+            if (trip != null) {
+                currentTrip = trip;
+                populateUiWithTripData();
+            }
+        });
+    }
+
+    private void populateUiWithTripData() {
+        if (currentTrip == null) return;
+
+        editTripTitle.setText(currentTrip.getTitle());
+        editDestination.setText(currentTrip.getDestination());
+
+        startCalendar.setTimeInMillis(currentTrip.getStartDate());
+        endCalendar.setTimeInMillis(currentTrip.getEndDate());
+        updateDateDisplays();
+
+        // Update toolbar title again as this might be called after setupToolbar
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(R.string.edit_trip);
+        }
+    }
+    
     private void saveTrip() {
         String title = editTripTitle.getText().toString().trim();
         String destination = editDestination.getText().toString().trim();
@@ -171,6 +213,14 @@ public class AddTripActivity extends AppCompatActivity {
         // Show loading
         setLoadingState(true);
         
+        if (isEditMode) {
+            updateCurrentTrip(title, destination);
+        } else {
+            insertNewTrip(title, destination);
+        }
+    }
+
+    private void insertNewTrip(String title, String destination) {
         try {
             // Create trip object with validation
             Trip trip = new Trip(title, destination, startCalendar.getTimeInMillis(), endCalendar.getTimeInMillis());
@@ -270,6 +320,43 @@ public class AddTripActivity extends AppCompatActivity {
             Log.e(TAG, "Unexpected error creating trip: " + e.getMessage(), e);
             Toast.makeText(this, "Unexpected error occurred. Please try again.", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void updateCurrentTrip(String title, String destination) {
+        if (currentTrip == null) {
+            setLoadingState(false);
+            Toast.makeText(this, "Error: Trip data not loaded.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        currentTrip.setTitle(title);
+        currentTrip.setDestination(destination);
+        currentTrip.setStartDate(startCalendar.getTimeInMillis());
+        currentTrip.setEndDate(endCalendar.getTimeInMillis());
+        currentTrip.setUpdatedAt(System.currentTimeMillis());
+
+        viewModel.updateTrip(currentTrip, new TripRepository.OnTripOperationListener() {
+            @Override
+            public void onSuccess(int tripId) {
+                runOnUiThread(() -> {
+                    setLoadingState(false);
+                    SuccessDialogHelper.showSuccessDialog(
+                        AddTripActivity.this,
+                        getString(R.string.trip_updated_successfully),
+                        () -> finish()
+                    );
+                });
+            }
+
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> {
+                    setLoadingState(false);
+                    Log.e(TAG, "Error updating trip: " + error);
+                    Toast.makeText(AddTripActivity.this, "Failed to update trip: " + error, Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
     
     private void setLoadingState(boolean loading) {

@@ -6,6 +6,7 @@ import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,6 +30,7 @@ public class RegisterActivity extends AppCompatActivity {
     private Button registerButton;
     private Button skipButton;
     private TextView loginText;
+    private ProgressBar loadingProgressBar;
     
     private UserManager userManager;
     
@@ -60,6 +62,7 @@ public class RegisterActivity extends AppCompatActivity {
         registerButton = findViewById(R.id.register_button);
         skipButton = findViewById(R.id.skip_button);
         loginText = findViewById(R.id.login_text);
+        loadingProgressBar = findViewById(R.id.loading_progress_bar);
     }
 
     private void setupClickListeners() {
@@ -120,13 +123,13 @@ public class RegisterActivity extends AppCompatActivity {
             return;
         }
 
-        // Disable button to prevent multiple submissions
-        registerButton.setEnabled(false);
+        showLoading(true);
         
         // Register with Firebase
         userManager.registerUser(email, password, name, new UserManager.OnAuthCompleteListener() {
             @Override
             public void onSuccess() {
+                showLoading(false);
                 Toast.makeText(RegisterActivity.this, 
                     "Registration successful! Please verify your email.", Toast.LENGTH_LONG).show();
                 
@@ -139,7 +142,7 @@ public class RegisterActivity extends AppCompatActivity {
 
             @Override
             public void onError(String error) {
-                registerButton.setEnabled(true);
+                showLoading(false);
                 
                 // Check if it's an email verification error (user created but email failed)
                 if (error.contains("failed to send verification email")) {
@@ -175,6 +178,28 @@ public class RegisterActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+    }
+
+    private void showLoading(boolean isLoading) {
+        if (isLoading) {
+            loadingProgressBar.setVisibility(android.view.View.VISIBLE);
+            registerButton.setEnabled(false);
+            nameEditText.setEnabled(false);
+            emailEditText.setEnabled(false);
+            passwordEditText.setEnabled(false);
+            confirmPasswordEditText.setEnabled(false);
+            skipButton.setEnabled(false);
+            loginText.setClickable(false);
+        } else {
+            loadingProgressBar.setVisibility(android.view.View.GONE);
+            registerButton.setEnabled(true);
+            nameEditText.setEnabled(true);
+            emailEditText.setEnabled(true);
+            passwordEditText.setEnabled(true);
+            confirmPasswordEditText.setEnabled(true);
+            skipButton.setEnabled(true);
+            loginText.setClickable(true);
+        }
     }
 
     private void togglePasswordVisibility() {

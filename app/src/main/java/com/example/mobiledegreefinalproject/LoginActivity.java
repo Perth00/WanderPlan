@@ -4,13 +4,16 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.textfield.TextInputEditText;
@@ -27,6 +30,7 @@ public class LoginActivity extends AppCompatActivity {
     private TextView forgotPasswordText;
     private TextView registerText;
     private TextView continueAsGuestText;
+    private ProgressBar loadingProgressBar;
     
     private boolean isPasswordVisible = false;
     private UserManager userManager;
@@ -54,6 +58,7 @@ public class LoginActivity extends AppCompatActivity {
         forgotPasswordText = findViewById(R.id.forgot_password_text);
         registerText = findViewById(R.id.register_text);
         continueAsGuestText = findViewById(R.id.continue_as_guest_text);
+        loadingProgressBar = findViewById(R.id.loading_progress_bar);
     }
 
     private void setupClickListeners() {
@@ -102,13 +107,13 @@ public class LoginActivity extends AppCompatActivity {
         emailInputLayout.setError(null);
         passwordInputLayout.setError(null);
 
-        // Disable button to prevent multiple submissions
-        loginButton.setEnabled(false);
-        
+        showLoading(true);
+
         // Login with Firebase
         userManager.loginUser(email, password, new UserManager.OnAuthCompleteListener() {
             @Override
             public void onSuccess() {
+                showLoading(false);
                 Toast.makeText(LoginActivity.this, "Login successful!", Toast.LENGTH_SHORT).show();
                 
                 // Check for trip sync after successful login
@@ -117,7 +122,7 @@ public class LoginActivity extends AppCompatActivity {
 
             @Override
             public void onError(String error) {
-                loginButton.setEnabled(true);
+                showLoading(false);
                 
                 // Check if it's an email verification error
                 if (error.contains("verify your email")) {
@@ -529,11 +534,7 @@ public class LoginActivity extends AppCompatActivity {
                         "☁️ USE CLOUD ONLY:\n" +
                         "• Delete ALL local trips & activities\n" +
                         "• Download cloud data (if any exists)\n" +
-                        "• ⚠️ WARNING: Local data will be lost!\n\n" +
-                        "📱 KEEP LOCAL ONLY:\n" +
-                        "• Continue with local data only\n" +
-                        "• No changes to your data\n" +
-                        "• No cloud backup created";
+                        "• ⚠️ WARNING: Local data will be lost!";
         
         new android.app.AlertDialog.Builder(this)
                 .setTitle("🔄 Data Sync Choice")
@@ -543,9 +544,6 @@ public class LoginActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("☁️ Use Cloud Only", (dialog, which) -> {
                     showClearLocalDataConfirmation();
-                })
-                .setNeutralButton("📱 Keep Local Only", (dialog, which) -> {
-                    navigateToMainActivity();
                 })
                 .setCancelable(false)
                 .show();
@@ -623,47 +621,64 @@ public class LoginActivity extends AppCompatActivity {
     }
     
     private void showSyncSuccessDialog(int tripsSynced, int activitiesSynced) {
-        // Build message without showing "Activities: 0" when there are no activities
-        String activitiesText = activitiesSynced > 0 ? "\n📝 Activities: " + activitiesSynced : "";
-        
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("✅ Backup Complete")
-                .setMessage("🎉 Success!\n\n" +
-                           "📊 Data backed up to Firebase:\n" +
-                           "🧳 Trips: " + tripsSynced + 
-                           activitiesText + "\n" +
-                           "🖼️ Images: Uploaded to Firebase Storage\n\n" +
-                           "✅ Your local data is still safe on this device\n" +
-                           "☁️ Cloud backup created for access anywhere!")
-                .setPositiveButton("Continue", (dialog, which) -> {
-                    navigateToMainActivity();
-                })
-                .setIcon(android.R.drawable.ic_dialog_info)
-                .show();
+        showBackupCompleteDialog(tripsSynced, activitiesSynced);
     }
     
     private void showSyncErrorDialog(String error) {
         new android.app.AlertDialog.Builder(this)
-                .setTitle("❌ Backup Failed")
-                .setMessage("⚠️ There was an issue creating your cloud backup:\n\n" + error + 
-                           "\n\nDon't worry:\n" +
-                           "✅ Your local data is completely safe\n" +
-                           "✅ All trips are still available on this device\n\n" +
-                           "You can:\n" +
-                           "• Try backup again later\n" +
-                           "• Continue using local data")
-                .setPositiveButton("Try Again", (dialog, which) -> {
-                    startDataSync();
-                })
-                .setNegativeButton("Continue with Local", (dialog, which) -> {
-                    navigateToMainActivity();
-                })
-                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setTitle("⚠️ Sync Failed")
+                .setMessage("An error occurred during data sync:\n\n" + error)
+                .setPositiveButton("Try Again Later", (dialog, which) -> navigateToMainActivity())
+                .setCancelable(false)
                 .show();
+    }
+    
+    private void showBackupCompleteDialog(int tripsSynced, int activitiesSynced) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            LayoutInflater inflater = this.getLayoutInflater();
+        View dialogView = inflater.inflate(R.layout.dialog_backup_complete, null);
+        builder.setView(dialogView);
+        builder.setCancelable(false);
+
+        TextView tripsSyncedText = dialogView.findViewById(R.id.tv_trips_synced);
+        TextView activitiesSyncedText = dialogView.findViewById(R.id.tv_activities_synced);
+        Button continueButton = dialogView.findViewById(R.id.btn_continue);
+
+        tripsSyncedText.setText("✈️ Trips: " + tripsSynced);
+        activitiesSyncedText.setText("📝 Activities: " + activitiesSynced);
+
+        AlertDialog dialog = builder.create();
+
+        continueButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            navigateToMainActivity();
+        });
+
+        dialog.show();
     }
     
     private void showComingSoonSyncDialog() {
         // This method is now replaced by the actual sync functionality above
         startDataSync();
+    }
+
+    private void showLoading(boolean isLoading) {
+        if (isLoading) {
+            loadingProgressBar.setVisibility(View.VISIBLE);
+            loginButton.setEnabled(false);
+            emailEditText.setEnabled(false);
+            passwordEditText.setEnabled(false);
+            registerText.setClickable(false);
+            forgotPasswordText.setClickable(false);
+            continueAsGuestText.setClickable(false);
+        } else {
+            loadingProgressBar.setVisibility(View.GONE);
+            loginButton.setEnabled(true);
+            emailEditText.setEnabled(true);
+            passwordEditText.setEnabled(true);
+            registerText.setClickable(true);
+            forgotPasswordText.setClickable(true);
+            continueAsGuestText.setClickable(true);
+        }
     }
 } 

@@ -23,7 +23,7 @@ import com.example.mobiledegreefinalproject.repository.TripRepository;
 import com.example.mobiledegreefinalproject.viewmodel.TripsViewModel;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-public class TripsFragment extends Fragment {
+public class TripsFragment extends Fragment implements TripsAdapter.OnTripEditListener {
 
     private RecyclerView tripsRecyclerView;
     private FloatingActionButton fabAddTrip;
@@ -109,7 +109,9 @@ public class TripsFragment extends Fragment {
             // Delete listener for deleting trips (when delete button is clicked)
             trip -> {
                 showDeleteTripDialog(trip);
-            }
+            },
+            // Edit listener
+            this
         );
         
         // Add long click listener to directly show delete dialog
@@ -155,6 +157,13 @@ public class TripsFragment extends Fragment {
             () -> deleteTrip(trip), // On confirm delete
             null // On cancel (no action needed)
         );
+    }
+
+    @Override
+    public void onTripEdit(Trip trip) {
+        Intent intent = new Intent(getContext(), AddTripActivity.class);
+        intent.putExtra("trip_id", trip.getId());
+        startActivity(intent);
     }
 
     private void deleteTrip(Trip trip) {

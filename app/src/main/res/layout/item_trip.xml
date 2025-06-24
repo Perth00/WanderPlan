@@ -72,6 +72,16 @@
                 tools:text="7 days" />
 
             <ImageButton
+                android:id="@+id/btn_edit_trip"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_edit"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/edit_trip"
+                app:tint="@color/text_secondary"
+                android:layout_marginEnd="8dp"/>
+
+            <ImageButton
                 android:id="@+id/btn_delete_trip"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
@@ -79,7 +89,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/delete_trip"
                 app:tint="@color/text_secondary"
-                android:visibility="gone" />
+                 />
 
         </LinearLayout>
 

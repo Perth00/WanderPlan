@@ -152,7 +152,8 @@ public class InfoPanelManager {
     public void showTripManagementTips() {
         if (tripTips != null) {
             // Add emoji prefix and set proper color for trip tips
-            String tipsText = "🗺️ Long press a trip in 'My Trips' to delete it\n" +
+            String tipsText = "✏️ Tap the edit icon to modify a trip's details\n" +
+                             "🗺️ Long press a trip in 'My Trips' to delete it\n" +
                              "🏠 Home shows upcoming trips (view-only)\n" +
                              "🔄 Sync requires a registered account";
             tripTips.setText(tipsText);
