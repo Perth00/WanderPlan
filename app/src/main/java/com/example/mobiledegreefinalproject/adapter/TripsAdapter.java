@@ -25,24 +25,35 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
         void onTripDelete(Trip trip);
     }
     
+    public interface OnTripEditListener {
+        void onTripEdit(Trip trip);
+    }
+    
     public interface OnTripLongClickListener {
         boolean onTripLongClick(Trip trip);
     }
     
     private final OnTripClickListener clickListener;
     private final OnTripDeleteListener deleteListener;
+    private final OnTripEditListener editListener;
     private OnTripLongClickListener longClickListener;
     private boolean deleteMode = false;
     
-    public TripsAdapter(OnTripClickListener clickListener, OnTripDeleteListener deleteListener) {
+    public TripsAdapter(OnTripClickListener clickListener, OnTripDeleteListener deleteListener, OnTripEditListener editListener) {
         super(DIFF_CALLBACK);
         this.clickListener = clickListener;
         this.deleteListener = deleteListener;
+        this.editListener = editListener;
+    }
+    
+    // Keep the old constructor for backward compatibility
+    public TripsAdapter(OnTripClickListener clickListener, OnTripDeleteListener deleteListener) {
+        this(clickListener, deleteListener, null);
     }
     
     // Keep the old constructor for backward compatibility
     public TripsAdapter(OnTripClickListener clickListener) {
-        this(clickListener, null);
+        this(clickListener, null, null);
     }
     
     public void setOnLongClickListener(OnTripLongClickListener longClickListener) {
@@ -84,7 +95,7 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
     @Override
     public void onBindViewHolder(@NonNull TripViewHolder holder, int position) {
         Trip trip = getItem(position);
-        holder.bind(trip, clickListener, deleteListener, longClickListener, deleteMode);
+        holder.bind(trip, clickListener, deleteListener, editListener, longClickListener, deleteMode);
     }
     
     static class TripViewHolder extends RecyclerView.ViewHolder {
@@ -94,6 +105,7 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
         private final TextView durationText;
         private final ImageView mapPreview;
         private final ImageButton deleteButton;
+        private final ImageButton editButton;
         
         public TripViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -103,9 +115,10 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
             durationText = itemView.findViewById(R.id.trip_duration);
             mapPreview = itemView.findViewById(R.id.trip_map_preview);
             deleteButton = itemView.findViewById(R.id.btn_delete_trip);
+            editButton = itemView.findViewById(R.id.btn_edit_trip);
         }
         
-        public void bind(Trip trip, OnTripClickListener clickListener, OnTripDeleteListener deleteListener, OnTripLongClickListener longClickListener, boolean deleteMode) {
+        public void bind(Trip trip, OnTripClickListener clickListener, OnTripDeleteListener deleteListener, OnTripEditListener editListener, OnTripLongClickListener longClickListener, boolean deleteMode) {
             titleText.setText(trip.getTitle());
             destinationText.setText(trip.getDestination());
             dateRangeText.setText(trip.getDateRange());
@@ -134,6 +147,16 @@ public class TripsAdapter extends ListAdapter<Trip, TripsAdapter.TripViewHolder>
                 deleteButton.setOnClickListener(v -> {
                     if (deleteListener != null) {
                         deleteListener.onTripDelete(trip);
+                    }
+                });
+            }
+            
+            // Set up edit button
+            if (editButton != null) {
+                editButton.setVisibility((editListener != null) ? View.VISIBLE : View.GONE);
+                editButton.setOnClickListener(v -> {
+                    if (editListener != null) {
+                        editListener.onTripEdit(trip);
                     }
                 });
             }

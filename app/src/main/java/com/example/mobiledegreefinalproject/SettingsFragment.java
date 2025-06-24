@@ -231,8 +231,11 @@ public class SettingsFragment extends Fragment {
         try {
             if (syncLayout == null) return;
             
-            // Sync option is available for all users (logged-in users can sync, guests will be prompted to login)
-            syncLayout.setVisibility(View.VISIBLE);
+            if (userManager.isLoggedIn()) {
+                syncLayout.setVisibility(View.GONE);
+            } else {
+                syncLayout.setVisibility(View.VISIBLE);
+            }
         } catch (Exception e) {
             android.util.Log.e("SettingsFragment", "Error updating sync visibility", e);
         }

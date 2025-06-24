@@ -534,11 +534,7 @@ public class LoginActivity extends AppCompatActivity {
                         "☁️ USE CLOUD ONLY:\n" +
                         "• Delete ALL local trips & activities\n" +
                         "• Download cloud data (if any exists)\n" +
-                        "• ⚠️ WARNING: Local data will be lost!\n\n" +
-                        "📱 KEEP LOCAL ONLY:\n" +
-                        "• Continue with local data only\n" +
-                        "• No changes to your data\n" +
-                        "• No cloud backup created";
+                        "• ⚠️ WARNING: Local data will be lost!";
         
         new android.app.AlertDialog.Builder(this)
                 .setTitle("🔄 Data Sync Choice")
@@ -548,9 +544,6 @@ public class LoginActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("☁️ Use Cloud Only", (dialog, which) -> {
                     showClearLocalDataConfirmation();
-                })
-                .setNeutralButton("📱 Keep Local Only", (dialog, which) -> {
-                    navigateToMainActivity();
                 })
                 .setCancelable(false)
                 .show();
@@ -642,7 +635,7 @@ public class LoginActivity extends AppCompatActivity {
     
     private void showBackupCompleteDialog(int tripsSynced, int activitiesSynced) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        LayoutInflater inflater = this.getLayoutInflater();
+            LayoutInflater inflater = this.getLayoutInflater();
         View dialogView = inflater.inflate(R.layout.dialog_backup_complete, null);
         builder.setView(dialogView);
         builder.setCancelable(false);
