@@ -942,19 +942,11 @@ public class BudgetFragment extends Fragment implements ModernExpenseAdapter.OnE
 
     @Override
     public void onEditExpense(Expense expense) {
-        if (selectedTrip == null) {
-            showErrorToast("Please select a specific trip to edit expenses");
-            return;
-        }
         showEditExpenseDialog(expense);
     }
 
-        @Override
+    @Override
     public void onDeleteExpense(Expense expense) {
-        if (selectedTrip == null) {
-            showErrorToast("Please select a specific trip to delete expenses");
-            return;
-        }
         showDeleteConfirmationDialog(expense);
     }
 

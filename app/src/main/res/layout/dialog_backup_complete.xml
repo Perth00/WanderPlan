@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@drawable/bg_rounded_card">
+
+    <TextView
+        android:id="@+id/tv_backup_title"
+        style="@style/WanderPlan.Text.Headline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="✅ Backup Complete"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/tv_backup_subtitle"
+        style="@style/WanderPlan.Text.Body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🎉 Success!"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="24dp"/>
+
+    <TextView
+        style="@style/WanderPlan.Text.Body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📊 Data backed up to Firebase:"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/tv_trips_synced"
+        style="@style/WanderPlan.Text.Body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="✈️ Trips: 0"
+        android:layout_marginStart="16dp"/>
+
+    <TextView
+        android:id="@+id/tv_activities_synced"
+        style="@style/WanderPlan.Text.Body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📝 Activities: 0"
+        android:layout_marginStart="16dp"/>
+
+    <TextView
+        android:id="@+id/tv_images_synced"
+        style="@style/WanderPlan.Text.Body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🖼️ Images: Uploaded to Firebase Storage"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="24dp"/>
+
+    <TextView
+        style="@style/WanderPlan.Text.Body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="✅ Your local data is still safe on this device"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        style="@style/WanderPlan.Text.Body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="☁️ Cloud backup created for access anywhere!"
+        android:layout_marginBottom="24dp"/>
+
+    <Button
+        android:id="@+id/btn_continue"
+        style="@style/WanderPlan.Button.Primary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Continue"/>
+</LinearLayout> 
