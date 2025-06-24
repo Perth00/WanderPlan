@@ -35,6 +35,8 @@ import android.graphics.drawable.Drawable;
 import com.example.mobiledegreefinalproject.repository.BudgetRepository;
 import com.example.mobiledegreefinalproject.model.Expense;
 
+import android.net.Uri;
+
 /**
  * Service to sync local database data to Firebase as JSON
  * This approach reduces crashes by storing data in JSON format
@@ -250,15 +252,19 @@ public class DataSyncService {
      * Check if activity has a local image that needs to be uploaded
      */
     private boolean hasLocalImageToUpload(TripActivity activity) {
+        // First, check the dedicated local path field
+        if (activity.getImageLocalPath() != null && !activity.getImageLocalPath().isEmpty()) {
+            return true;
+        }
+        
+        // If that's empty, check if imageUrl contains a local path
         String imageUrl = activity.getImageUrl();
         if (imageUrl == null || imageUrl.isEmpty()) {
             return false;
         }
         
         // Check if it's a local file path (not a Firebase URL)
-        return !imageUrl.startsWith("https://firebasestorage.googleapis.com") && 
-               (imageUrl.startsWith("file://") || imageUrl.startsWith("content://") || 
-                imageUrl.startsWith("/") || imageUrl.contains("/activity_images/"));
+        return !imageUrl.startsWith("https://firebasestorage.googleapis.com");
     }
     
     /**
@@ -268,14 +274,20 @@ public class DataSyncService {
     private void uploadActivityImageAndSync(String userEmail, String tripFirebaseId, TripActivity activity, 
                                           AtomicInteger completedActivities, int totalActivities, OnTripSyncListener listener) {
         try {
-            String imageUrl = activity.getImageUrl();
-            Log.d(TAG, "📤 Processing image for upload: " + imageUrl);
+            // Determine the correct path to use for the upload
+            String imagePathToUpload = activity.getImageLocalPath();
+            if (imagePathToUpload == null || imagePathToUpload.isEmpty()) {
+                imagePathToUpload = activity.getImageUrl();
+            }
+
+            final String finalImagePath = imagePathToUpload; // Create a final copy for the inner class
+            Log.d(TAG, "📤 Processing image for upload: " + finalImagePath);
             
             // Use Glide to load the image (same as AddActivityActivity) - this handles content:// URIs properly
             try {
                 Glide.with(context)
                         .asBitmap()
-                        .load(imageUrl)
+                        .load(finalImagePath)
                         .override(1024, 1024) // Reasonable size for Firebase
                         .timeout(20000) // 20 second timeout
                         .into(new CustomTarget<Bitmap>() {
@@ -287,22 +299,22 @@ public class DataSyncService {
 
                             @Override
                             public void onLoadCleared(@Nullable Drawable placeholder) {
-                                Log.w(TAG, "⚠️ Glide load cleared for: " + imageUrl + ", syncing without image");
+                                Log.w(TAG, "⚠️ Glide load cleared for: " + finalImagePath + ", syncing without image");
                                 syncActivityToFirestore(userEmail, tripFirebaseId, activity, null, 
                                                       completedActivities, totalActivities, listener);
                             }
 
                             @Override
                             public void onLoadFailed(@Nullable Drawable errorDrawable) {
-                                Log.w(TAG, "⚠️ Glide failed to load image: " + imageUrl + ", syncing without image");
+                                Log.w(TAG, "⚠️ Glide failed to load image: " + finalImagePath + ", syncing without image");
                                 syncActivityToFirestore(userEmail, tripFirebaseId, activity, null, 
                                                       completedActivities, totalActivities, listener);
                             }
                         });
             } catch (IllegalArgumentException e) {
                 // Context might be destroyed or invalid
-                Log.w(TAG, "⚠️ Context invalid for Glide, using fallback image loading for: " + imageUrl, e);
-                loadImageWithFallback(imageUrl, userEmail, tripFirebaseId, activity, completedActivities, totalActivities, listener);
+                Log.w(TAG, "⚠️ Context invalid for Glide, using fallback image loading for: " + finalImagePath, e);
+                loadImageWithFallback(finalImagePath, userEmail, tripFirebaseId, activity, completedActivities, totalActivities, listener);
             }
                     
         } catch (Exception e) {
@@ -464,7 +476,6 @@ public class DataSyncService {
         
         return null;
     }
-
     
     /**
      * Sync activity to Firestore with optional Firebase image URL (with duplicate prevention)

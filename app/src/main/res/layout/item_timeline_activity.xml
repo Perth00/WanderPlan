@@ -53,6 +53,18 @@
                 android:maxLines="2"
                 android:ellipsize="end" />
 
+            <!-- Edit Icon -->
+            <ImageView
+                android:id="@+id/edit_activity_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="8dp"
+                android:src="@drawable/ic_edit"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Edit activity" />
+
         </LinearLayout>
 
         <!-- Description -->

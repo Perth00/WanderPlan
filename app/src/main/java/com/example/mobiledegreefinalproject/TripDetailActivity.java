@@ -235,6 +235,15 @@ public class TripDetailActivity extends AppCompatActivity {
                 // Handle long click - show delete option
                 showDeleteActivityDialog(activity);
             }
+
+            @Override
+            public void onEditActivityClick(TripActivity activity) {
+                Log.d(TAG, "Edit icon clicked for activity: " + activity.getTitle());
+                Intent intent = new Intent(TripDetailActivity.this, AddActivityActivity.class);
+                intent.putExtra("trip_id", tripId);
+                intent.putExtra("activity_to_edit", activity); // This is the key for edit mode
+                addActivityLauncher.launch(intent);
+            }
         });
 
         timelineRecyclerView.setLayoutManager(new LinearLayoutManager(this));

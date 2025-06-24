@@ -14,7 +14,9 @@ import com.example.mobiledegreefinalproject.database.TripDao;
 import com.example.mobiledegreefinalproject.database.WanderPlanDatabase;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -889,181 +891,46 @@ public class TripRepository {
     
     // CRITICAL FIX: Add synchronous method for safe deletion operations
     public List<TripActivity> getActivitiesForTripSync(int tripId) {
-        try {
-            return activityDao.getActivitiesForTripSync(tripId);
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting activities for trip sync", e);
-            return new ArrayList<>();
-        }
+        return activityDao.getActivitiesForTripSync(tripId);
     }
-    
+
     public void insertActivity(TripActivity activity, OnActivityOperationListener listener) {
         executor.execute(() -> {
             try {
-                Log.d(TAG, "=== STARTING ACTIVITY INSERTION ===");
-                Log.d(TAG, "Activity: " + activity.getTitle() + " for trip: " + activity.getTripId());
-                
-                // CRITICAL FIX: Add synchronization for logged-in users to prevent data corruption
-                synchronized (this) {
-                    // Step 0: Check for potential duplicates before saving (more lenient check)
-                    if (userManager.isLoggedIn() && !FORCE_LOCAL_ONLY) {
-                        List<TripActivity> existingActivities = activityDao.getActivitiesForTripSync(activity.getTripId());
-                        for (TripActivity existing : existingActivities) {
-                            // Check if exact duplicate exists (same title and within 30 seconds)
-                            if (existing.getTitle().equals(activity.getTitle()) &&
-                                Math.abs(existing.getDateTime() - activity.getDateTime()) < 30000) { // 30 seconds only
-                                Log.w(TAG, "Exact duplicate activity detected, skipping insertion");
-                                if (listener != null) {
-                                    listener.onSuccess(existing.getId());
-                                }
-                                return;
-                            }
-                        }
-                    }
-                    
-                    // Step 1: Save to local database first for immediate response
-                    long activityId = activityDao.insertActivity(activity);
-                    activity.setId((int) activityId);
-                    
-                    Log.d(TAG, "✓ Activity saved locally with ID: " + activityId);
-                    
-                    // Step 2: Handle Firebase sync for logged-in users
-                    if (userManager.isLoggedIn() && !FORCE_LOCAL_ONLY) {
-                        // Get trip information
-                        Trip trip = tripDao.getTripByIdSync(activity.getTripId());
-                        if (trip == null) {
-                            Log.e(TAG, "Trip not found for activity insertion");
-                            if (listener != null) {
-                                listener.onError("Trip not found for activity");
-                            }
-                            return;
-                        }
-                        
-                        if (trip.getFirebaseId() != null && !trip.getFirebaseId().isEmpty()) {
-                            Log.d(TAG, "Trip has Firebase ID, syncing activity with timeout protection");
-                            
-                            // Use timeout-protected sync operation to prevent hanging
-                            syncActivityToFirebaseWithTimeout(activity, new OnActivityOperationListener() {
-                                @Override
-                                public void onSuccess(int syncedActivityId) {
-                                    Log.d(TAG, "✓ Activity synced to Firebase successfully");
-                                    if (listener != null) {
-                                        listener.onSuccess((int) activityId);
-                                    }
-                                }
-                                
-                                @Override
-                                public void onError(String error) {
-                                    Log.w(TAG, "⚠ Firebase sync failed, but local save succeeded: " + error);
-                                    // Still consider successful since local save worked
-                                    if (listener != null) {
-                                        listener.onSuccess((int) activityId);
-                                    }
-                                }
-                            }, 30000); // 30 second timeout
-                        } else {
-                            // Trip exists but not synced to Firebase - try to sync trip first
-                            Log.d(TAG, "Trip not synced to Firebase, attempting trip sync first");
-                            syncTripToFirebase(trip, new OnTripOperationListener() {
-                                @Override
-                                public void onSuccess(int tripSyncId) {
-                                    Log.d(TAG, "✓ Trip synced successfully, now syncing activity");
-                                    
-                                    syncActivityToFirebaseWithTimeout(activity, new OnActivityOperationListener() {
-                                        @Override
-                                        public void onSuccess(int syncedActivityId) {
-                                            Log.d(TAG, "✓ Activity synced after trip sync");
-                                            if (listener != null) {
-                                                listener.onSuccess((int) activityId);
-                                            }
-                                        }
-                                        
-                                        @Override
-                                        public void onError(String error) {
-                                            Log.w(TAG, "⚠ Activity sync failed after trip sync: " + error);
-                                            if (listener != null) {
-                                                listener.onSuccess((int) activityId);
-                                            }
-                                        }
-                                    }, 30000);
-                                }
-                                
-                                @Override
-                                public void onError(String error) {
-                                    Log.w(TAG, "⚠ Trip sync failed, saving activity locally only: " + error);
-                                    if (listener != null) {
-                                        listener.onSuccess((int) activityId);
-                                    }
-                                }
-                            });
-                        }
-                    } else {
-                        Log.d(TAG, "Guest user or local-only mode, skipping Firebase sync");
-                        if (listener != null) {
-                            listener.onSuccess((int) activityId);
-                        }
-                    }
+                long localId = activityDao.insertActivity(activity);
+                activity.setId((int) localId);
+                Log.d(TAG, "Activity '" + activity.getTitle() + "' inserted locally with ID: " + localId);
+
+                if (!userManager.isLoggedIn()) {
+                    if (listener != null) runOnUiThread(() -> listener.onSuccess(activity.getId()));
+                    return;
                 }
-                
+                syncActivityToFirebase(activity, listener);
             } catch (Exception e) {
-                Log.e(TAG, "=== CRITICAL ERROR IN ACTIVITY INSERTION ===", e);
-                if (listener != null) {
-                    listener.onError("Failed to save activity: " + e.getMessage());
-                }
+                Log.e(TAG, "Error during local activity insertion", e);
+                if (listener != null) runOnUiThread(() -> listener.onError(e.getMessage()));
             }
         });
     }
-    
+
     public void updateActivity(TripActivity activity, OnActivityOperationListener listener) {
         executor.execute(() -> {
             try {
-                Log.d(TAG, "=== STARTING ACTIVITY UPDATE ===");
-                Log.d(TAG, "Activity: " + activity.getTitle() + " (ID: " + activity.getId() + ", Firebase ID: " + activity.getFirebaseId() + ")");
-                
-                // CRITICAL FIX: Add synchronization to prevent corruption during updates
-                synchronized (this) {
-                    // Step 1: Always update local database first
-                    activityDao.updateActivity(activity);
-                    Log.d(TAG, "✓ Activity updated in local database");
-                    
-                    // Step 2: Handle Firebase sync for logged-in users
-                    if (userManager.isLoggedIn() && activity.getFirebaseId() != null && !activity.getFirebaseId().isEmpty()) {
-                        Log.d(TAG, "Syncing updated activity to Firebase with timeout protection");
-                        syncActivityToFirebaseWithTimeout(activity, new OnActivityOperationListener() {
-                            @Override
-                            public void onSuccess(int syncedActivityId) {
-                                Log.d(TAG, "✓ Activity update synced to Firebase successfully");
-                                if (listener != null) {
-                                    listener.onSuccess(activity.getId());
-                                }
-                            }
-                            
-                            @Override
-                            public void onError(String error) {
-                                Log.w(TAG, "⚠ Firebase sync failed for update, but local update succeeded: " + error);
-                                // Still consider successful since local update worked
-                                if (listener != null) {
-                                    listener.onSuccess(activity.getId());
-                                }
-                            }
-                        }, 30000); // 30 second timeout
-                    } else {
-                        Log.d(TAG, "Guest user or no Firebase ID, skipping Firebase sync");
-                        if (listener != null) {
-                            listener.onSuccess(activity.getId());
-                        }
-                    }
+                activityDao.updateActivity(activity);
+                Log.d(TAG, "Activity '" + activity.getTitle() + "' updated locally.");
+
+                if (!userManager.isLoggedIn()) {
+                    if (listener != null) runOnUiThread(() -> listener.onSuccess(activity.getId()));
+                    return;
                 }
-                
+                syncActivityToFirebase(activity, listener);
             } catch (Exception e) {
-                Log.e(TAG, "=== CRITICAL ERROR IN ACTIVITY UPDATE ===", e);
-                if (listener != null) {
-                    listener.onError("Failed to update activity: " + e.getMessage());
-                }
+                Log.e(TAG, "Error during local activity update", e);
+                if (listener != null) runOnUiThread(() -> listener.onError(e.getMessage()));
             }
         });
     }
-    
+
     public void deleteActivity(TripActivity activity, OnActivityOperationListener listener) {
         executor.execute(() -> {
             try {
@@ -1535,238 +1402,166 @@ public class TripRepository {
     
     private void syncActivityToFirebase(TripActivity activity, OnActivityOperationListener listener) {
         if (!userManager.isLoggedIn()) {
-            if (listener != null) {
-                listener.onSuccess(activity.getId());
-            }
+            if (listener != null) runOnUiThread(() -> listener.onSuccess(activity.getId()));
             return;
         }
-        
-        // Get trip's Firebase ID
-        executor.execute(() -> {
-            Trip trip = tripDao.getTripByIdSync(activity.getTripId());
-            if (trip == null || trip.getFirebaseId() == null) {
-                if (listener != null) {
-                    listener.onError("Trip not synced to Firebase");
-                }
-                return;
-            }
-            
-            // CRITICAL FIX: Check for existing activities in Firebase to prevent duplicates
-            String userEmail = userManager.getUserEmail();
-            
-            firestore.collection("users")
-                .document(userEmail)
-                .collection("trips")
-                .document(trip.getFirebaseId())
-                .collection("activities")
-                .whereEqualTo("title", activity.getTitle())
-                .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    // Check if similar activity already exists in Firebase
-                    boolean duplicateFound = false;
-                    for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
-                        Long existingDateTime = doc.getLong("dateTime");
-                        if (existingDateTime != null && 
-                            Math.abs(existingDateTime - activity.getDateTime()) < 300000) { // 5 minutes
-                            Log.w(TAG, "🔄 Duplicate activity found in Firebase, updating instead of creating new: " + activity.getTitle());
-                            duplicateFound = true;
-                            
-                            // Update the existing Firebase document instead of creating a new one
-                            updateExistingFirebaseActivity(doc.getId(), activity, trip, listener);
-                            break;
-                        }
-                    }
-                    
-                    if (!duplicateFound) {
-                        // Proceed with normal sync (create new)
-                        performFirebaseSync(activity, trip, listener);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.w(TAG, "Error checking for duplicates, proceeding with sync", e);
-                    // If duplicate check fails, proceed with sync anyway
-                    performFirebaseSync(activity, trip, listener);
-                });
-        });
-    }
-    
-    /**
-     * Update existing Firebase activity document instead of creating duplicate
-     */
-    private void updateExistingFirebaseActivity(String existingFirebaseId, TripActivity activity, Trip trip, OnActivityOperationListener listener) {
-        Log.d(TAG, "📝 Updating existing Firebase activity: " + activity.getTitle() + " (Firebase ID: " + existingFirebaseId + ")");
-        
-        Map<String, Object> updateData = new HashMap<>();
-        updateData.put("description", activity.getDescription());
-        updateData.put("location", activity.getLocation());
-        updateData.put("timeString", activity.getTimeString());
-        updateData.put("updatedAt", activity.getUpdatedAt());
-        
-        // Only update image URL if the local activity has an image URL and it's different
-        if (activity.getImageUrl() != null && !activity.getImageUrl().isEmpty()) {
-            updateData.put("imageUrl", activity.getImageUrl());
-            Log.d(TAG, "🖼️ Updating image URL in existing Firebase activity");
-        }
-        
-        String userEmail = userManager.getUserEmail();
-        
-        firestore.collection("users")
-            .document(userEmail)
-            .collection("trips")
-            .document(trip.getFirebaseId())
-            .collection("activities")
-            .document(existingFirebaseId)
-            .update(updateData)
-            .addOnSuccessListener(aVoid -> {
-                Log.d(TAG, "✅ Successfully updated existing Firebase activity: " + activity.getTitle());
-                
-                // Update local activity with Firebase ID if it doesn't have one
-                if (activity.getFirebaseId() == null || activity.getFirebaseId().isEmpty()) {
-                    activity.setFirebaseId(existingFirebaseId);
-                    activityDao.updateActivityFirebaseId(activity.getId(), existingFirebaseId);
-                    Log.d(TAG, "🔗 Updated local activity with Firebase ID: " + existingFirebaseId);
-                }
-                
-                activityDao.markActivityAsSynced(activity.getId());
-                if (listener != null) {
-                    listener.onSuccess(activity.getId());
-                }
-            })
-            .addOnFailureListener(e -> {
-                Log.e(TAG, "❌ Error updating existing Firebase activity: " + activity.getTitle(), e);
-                if (listener != null) {
-                    listener.onError("Failed to update existing activity: " + e.getMessage());
-                }
-            });
+        performFirebaseSync(activity, listener);
     }
 
-    private void performFirebaseSync(TripActivity activity, Trip trip, OnActivityOperationListener listener) {
-        Map<String, Object> activityData = new HashMap<>();
-        activityData.put("title", activity.getTitle());
-        activityData.put("description", activity.getDescription());
-        activityData.put("location", activity.getLocation());
-        activityData.put("dateTime", activity.getDateTime());
-        activityData.put("dayNumber", activity.getDayNumber());
-        activityData.put("timeString", activity.getTimeString());
-        activityData.put("imageUrl", activity.getImageUrl() != null ? activity.getImageUrl() : "");
-        activityData.put("latitude", activity.getLatitude());
-        activityData.put("longitude", activity.getLongitude());
-        activityData.put("createdAt", activity.getCreatedAt());
-        activityData.put("updatedAt", activity.getUpdatedAt());
-        
-        String userEmail = userManager.getUserEmail();
-        
-        if (activity.getFirebaseId() != null) {
-            // Update existing activity
-            firestore.collection("users")
-                .document(userEmail)
-                .collection("trips")
-                .document(trip.getFirebaseId())
-                .collection("activities")
-                .document(activity.getFirebaseId())
-                .set(activityData)
-                .addOnSuccessListener(aVoid -> {
-                    activityDao.markActivityAsSynced(activity.getId());
-                    if (listener != null) {
-                        listener.onSuccess(activity.getId());
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error syncing activity to Firebase", e);
-                    if (listener != null) {
-                        listener.onError("Failed to sync activity: " + e.getMessage());
-                    }
-                });
-        } else {
-            // Create new activity
-            firestore.collection("users")
-                .document(userEmail)
-                .collection("trips")
-                .document(trip.getFirebaseId())
-                .collection("activities")
-                .add(activityData)
-                .addOnSuccessListener(documentReference -> {
-                    String firebaseId = documentReference.getId();
-                    // CRITICAL FIX: Update both database AND the activity object in memory
-                    activityDao.updateActivityFirebaseId(activity.getId(), firebaseId);
-                    activity.setFirebaseId(firebaseId);  // This was missing!
-                    activity.setSynced(true);
-                    Log.d(TAG, "✓ Firebase ID updated in memory for activity: " + activity.getTitle() + " -> " + firebaseId);
-                    if (listener != null) {
-                        listener.onSuccess(activity.getId());
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error creating activity in Firebase", e);
-                    if (listener != null) {
-                        listener.onError("Failed to sync activity: " + e.getMessage());
-                    }
-                });
-        }
-    }
-    
-    // CRITICAL FIX: Add timeout-protected Firebase sync to prevent hanging operations
-    private void syncActivityToFirebaseWithTimeout(TripActivity activity, OnActivityOperationListener listener, long timeoutMs) {
-        if (!userManager.isLoggedIn()) {
-            if (listener != null) {
-                listener.onSuccess(activity.getId());
-            }
-            return;
-        }
-        
-        Log.d(TAG, "Starting timeout-protected Firebase sync for activity: " + activity.getTitle());
-        
-        // Create a timeout handler
-        final boolean[] completed = {false};
-        android.os.Handler timeoutHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        
-        Runnable timeoutRunnable = () -> {
-            synchronized (completed) {
-                if (!completed[0]) {
-                    completed[0] = true;
-                    Log.w(TAG, "Firebase sync timeout for activity: " + activity.getTitle());
-                    if (listener != null) {
-                        listener.onSuccess(activity.getId()); // Consider local save successful
+    private void performFirebaseSync(TripActivity activity, OnActivityOperationListener listener) {
+        executor.execute(() -> {
+            try {
+                Trip trip = tripDao.getTripByIdSync(activity.getTripId());
+                if (trip == null || trip.getFirebaseId() == null) {
+                    if (listener != null) runOnUiThread(() -> listener.onError("Trip not synced to Firebase"));
+                    return;
+                }
+
+                Map<String, Object> activityData = new HashMap<>();
+                activityData.put("title", activity.getTitle());
+                activityData.put("description", activity.getDescription());
+                activityData.put("location", activity.getLocation());
+                activityData.put("dateTime", activity.getDateTime());
+                activityData.put("dayNumber", activity.getDayNumber());
+                activityData.put("timeString", activity.getTimeString());
+                activityData.put("latitude", activity.getLatitude());
+                activityData.put("longitude", activity.getLongitude());
+                activityData.put("createdAt", activity.getCreatedAt());
+                activityData.put("updatedAt", activity.getUpdatedAt());
+
+                // Check for local image path first
+                String imagePath = activity.getImageLocalPath();
+                if (imagePath == null || imagePath.isEmpty()) {
+                    // If no local path, check if imageUrl is actually a local path
+                    String imageUrl = activity.getImageUrl();
+                    if (imageUrl != null && !imageUrl.isEmpty() && !imageUrl.startsWith("https://")) {
+                        imagePath = imageUrl;
                     }
                 }
-            }
-        };
-        
-        // Set timeout
-        timeoutHandler.postDelayed(timeoutRunnable, timeoutMs);
-        
-        // Perform the actual sync
-        syncActivityToFirebase(activity, new OnActivityOperationListener() {
-            @Override
-            public void onSuccess(int activityId) {
-                synchronized (completed) {
-                    if (!completed[0]) {
-                        completed[0] = true;
-                        timeoutHandler.removeCallbacks(timeoutRunnable);
-                        Log.d(TAG, "Firebase sync completed successfully for activity: " + activity.getTitle());
-                        if (listener != null) {
-                            listener.onSuccess(activityId);
-                        }
+
+                Log.d(TAG, "Image path to process: " + imagePath);
+
+                if (imagePath != null && !imagePath.isEmpty()) {
+                    // We have a local image to upload
+                    Log.d(TAG, "Uploading local image to Firebase: " + imagePath);
+                    File imageFile = new File(imagePath);
+                    if (!imageFile.exists()) {
+                        Log.e(TAG, "Image file does not exist: " + imagePath);
+                        if (listener != null) runOnUiThread(() -> listener.onError("Image file not found"));
+                        return;
                     }
+
+                    String imageName = "activity_" + System.currentTimeMillis() + "_" + imageFile.getName();
+                    StorageReference imageRef = storage.getReference().child("activity_images").child(imageName);
+
+                    // Upload the file
+                    imageRef.putFile(Uri.fromFile(imageFile))
+                            .addOnSuccessListener(taskSnapshot -> {
+                                Log.d(TAG, "Image uploaded successfully");
+                                // Get the download URL
+                                imageRef.getDownloadUrl()
+                                        .addOnSuccessListener(uri -> {
+                                            String firebaseUrl = uri.toString();
+                                            Log.d(TAG, "Got Firebase URL: " + firebaseUrl);
+                                            activity.setImageUrl(firebaseUrl);
+                                            activity.setImageLocalPath(null); // Clear local path
+                                            activityData.put("imageUrl", firebaseUrl);
+                                            saveActivityDataToFirestore(activity, trip, listener, activityData);
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.e(TAG, "Failed to get download URL", e);
+                                            if (listener != null) runOnUiThread(() -> 
+                                                listener.onError("Failed to get image URL: " + e.getMessage()));
+                                        });
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to upload image", e);
+                                if (listener != null) runOnUiThread(() -> 
+                                    listener.onError("Failed to upload image: " + e.getMessage()));
+                            });
+                } else if (activity.getImageUrl() != null && activity.getImageUrl().startsWith("https://")) {
+                    // Already has a Firebase URL
+                    Log.d(TAG, "Using existing Firebase URL: " + activity.getImageUrl());
+                    activityData.put("imageUrl", activity.getImageUrl());
+                    saveActivityDataToFirestore(activity, trip, listener, activityData);
+                } else {
+                    // No image
+                    Log.d(TAG, "No image to upload");
+                    activityData.put("imageUrl", "");
+                    saveActivityDataToFirestore(activity, trip, listener, activityData);
                 }
-            }
-            
-            @Override
-            public void onError(String error) {
-                synchronized (completed) {
-                    if (!completed[0]) {
-                        completed[0] = true;
-                        timeoutHandler.removeCallbacks(timeoutRunnable);
-                        Log.w(TAG, "Firebase sync failed for activity: " + activity.getTitle() + " - " + error);
-                        if (listener != null) {
-                            listener.onSuccess(activity.getId()); // Consider local save successful
-                        }
-                    }
-                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error in performFirebaseSync", e);
+                if (listener != null) runOnUiThread(() -> listener.onError(e.getMessage()));
             }
         });
     }
-    
+
+    private void saveActivityDataToFirestore(TripActivity activity, Trip trip, OnActivityOperationListener listener, Map<String, Object> activityData) {
+        String userEmail = userManager.getUserEmail();
+        if (userEmail == null || userEmail.isEmpty()) {
+            if (listener != null) runOnUiThread(() -> listener.onError("User not logged in"));
+            return;
+        }
+
+        String tripFirebaseId = trip.getFirebaseId();
+        if (tripFirebaseId == null || tripFirebaseId.isEmpty()) {
+            if (listener != null) runOnUiThread(() -> listener.onError("Trip is not synced to Firebase yet."));
+            return;
+        }
+        
+        // If activity has a Firebase ID, it's an update. Otherwise, it's a new creation.
+        if (activity.getFirebaseId() != null && !activity.getFirebaseId().isEmpty()) {
+            // UPDATE existing activity
+            Log.d(TAG, "Updating existing activity in Firestore with ID: " + activity.getFirebaseId());
+            firestore.collection("users").document(userEmail)
+                    .collection("trips").document(tripFirebaseId)
+                    .collection("activities").document(activity.getFirebaseId())
+                    .set(activityData, com.google.firebase.firestore.SetOptions.merge()) // Use merge to avoid overwriting fields
+                    .addOnSuccessListener(aVoid -> {
+                        Log.d(TAG, "Successfully updated activity in Firestore: " + activity.getTitle());
+                        executor.execute(() -> {
+                            activity.setSynced(true); // Ensure sync status is true
+                            activityDao.updateActivity(activity);
+                            Log.d(TAG, "Local activity updated after Firestore sync.");
+                        });
+                        if (listener != null) runOnUiThread(() -> listener.onSuccess(activity.getId()));
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to update activity in Firestore", e);
+                        if (listener != null) runOnUiThread(() -> listener.onError(e.getMessage()));
+                    });
+        } else {
+            // CREATE new activity
+            Log.d(TAG, "Creating new activity in Firestore for trip: " + trip.getTitle());
+            firestore.collection("users").document(userEmail)
+                    .collection("trips").document(tripFirebaseId)
+                    .collection("activities").add(activityData)
+                    .addOnSuccessListener(documentReference -> {
+                        String firebaseId = documentReference.getId();
+                        Log.d(TAG, "Activity data saved to Firestore with ID: " + firebaseId);
+
+                        // Update the local activity with the Firebase ID and sync status
+                        executor.execute(() -> {
+                            activity.setFirebaseId(firebaseId);
+                            activity.setSynced(true);
+                            activityDao.updateActivity(activity);
+                            Log.d(TAG, "Local activity updated with new Firebase ID: " + firebaseId);
+                        });
+
+                        if (listener != null) runOnUiThread(() -> listener.onSuccess(activity.getId()));
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to create new activity in Firestore", e);
+                        if (listener != null) runOnUiThread(() -> listener.onError(e.getMessage()));
+                    });
+        }
+    }
+
+    private static void runOnUiThread(Runnable runnable) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(runnable);
+    }
+
     // Clean up duplicate activities in local database
     private void cleanupLocalDuplicateActivities(int tripId) {
         // NUCLEAR PROTECTION: Absolutely block cleanup in Firebase-only mode
@@ -2530,5 +2325,15 @@ public class TripRepository {
                 }
             }
         });
+    }
+
+    // Callback interface for image uploads
+    interface ImageUploadCallback {
+        void onUrlReady(String url);
+        void onError(String error);
+    }
+
+    public void updateActivityFirebaseId(int activityId, String firebaseId) {
+        executor.execute(() -> activityDao.updateActivityFirebaseId(activityId, firebaseId));
     }
 }
