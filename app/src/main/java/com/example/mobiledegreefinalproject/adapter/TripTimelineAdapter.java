@@ -24,6 +24,8 @@ public class TripTimelineAdapter extends RecyclerView.Adapter<TripTimelineAdapte
         void onActivityClick(TripActivity activity);
 
         void onActivityLongClick(TripActivity activity);
+
+        void onEditActivityClick(TripActivity activity);
     }
 
     private final OnActivityClickListener clickListener;
@@ -129,6 +131,7 @@ public class TripTimelineAdapter extends RecyclerView.Adapter<TripTimelineAdapte
             private final TextView titleText;
             private final TextView descriptionText;
             private final ImageView activityImage;
+            private final ImageView editActivityIcon;
             private long lastLongClickTime = 0;
 
             public ActivityViewHolder(@NonNull View itemView) {
@@ -137,6 +140,7 @@ public class TripTimelineAdapter extends RecyclerView.Adapter<TripTimelineAdapte
                 titleText = itemView.findViewById(R.id.activity_title);
                 descriptionText = itemView.findViewById(R.id.activity_description);
                 activityImage = itemView.findViewById(R.id.activity_image);
+                editActivityIcon = itemView.findViewById(R.id.edit_activity_icon);
             }
 
             public void bind(TripActivity activity, OnActivityClickListener clickListener) {
@@ -170,6 +174,12 @@ public class TripTimelineAdapter extends RecyclerView.Adapter<TripTimelineAdapte
                 } else {
                     activityImage.setVisibility(View.GONE);
                 }
+
+                editActivityIcon.setOnClickListener(v -> {
+                    if (clickListener != null) {
+                        clickListener.onEditActivityClick(activity);
+                    }
+                });
 
                 // Set click listener for editing
                 itemView.setOnClickListener(v -> {
