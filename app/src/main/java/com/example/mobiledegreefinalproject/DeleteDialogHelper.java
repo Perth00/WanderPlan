@@ -112,7 +112,7 @@ public class DeleteDialogHelper {
     private static void showSimpleFallbackDialog(Context context, String title, String message, 
                                                Runnable onConfirmDelete, Runnable onCancel) {
         try {
-            new AlertDialog.Builder(context)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
                 .setTitle(title != null ? title : "Delete Item")
                 .setMessage(message != null ? message : "Are you sure you want to delete this item?")
                 .setPositiveButton("Delete", (dialog, which) -> {
@@ -126,7 +126,7 @@ public class DeleteDialogHelper {
                         onCancel.run();
                     }
                 })
-                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setIcon(R.drawable.ic_delete)
                 .setCancelable(false)
                 .show();
         } catch (Exception e) {

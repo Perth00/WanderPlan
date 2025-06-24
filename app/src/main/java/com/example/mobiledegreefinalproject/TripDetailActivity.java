@@ -774,7 +774,7 @@ public class TripDetailActivity extends BaseActivity {
             emptyStateText.setText("No activities planned yet.\nTap + to add your first activity!");
             
             if (timelineAdapter != null) {
-                timelineAdapter.submitData(new java.util.HashMap<>());
+                timelineAdapter.setTimelineData(new java.util.HashMap<>());
             }
             return;
         }
@@ -790,7 +790,7 @@ public class TripDetailActivity extends BaseActivity {
         // Display directly to adapter with crash protection
         try {
             if (timelineAdapter != null) {
-                timelineAdapter.submitData(groupedActivities);
+                timelineAdapter.setTimelineData(groupedActivities);
                 Log.d(TAG, "🔥 NUCLEAR: Data submitted to adapter successfully");
             } else {
                 Log.e(TAG, "🔥 NUCLEAR ERROR: Timeline adapter is null!");
@@ -884,7 +884,7 @@ public class TripDetailActivity extends BaseActivity {
             emptyStateText.setText("No activities planned yet.\nTap + to add your first activity!");
             
             if (timelineAdapter != null) {
-                timelineAdapter.submitData(new java.util.HashMap<>());
+                timelineAdapter.setTimelineData(new java.util.HashMap<>());
             }
             return;
         }
@@ -912,17 +912,31 @@ public class TripDetailActivity extends BaseActivity {
         
         Log.d(TAG, "📱 Grouped into " + groupedActivities.size() + " days");
         
-        // Submit data with crash protection
-        try {
+        // CRITICAL FIX: Sort the days chronologically before displaying
+        List<Map.Entry<Integer, List<TripActivity>>> sortedDays = new ArrayList<>(groupedActivities.entrySet());
+        java.util.Collections.sort(sortedDays, (e1, e2) -> Integer.compare(e1.getKey(), e2.getKey()));
+
+        // Create a new map to preserve sorted order
+        Map<Integer, List<TripActivity>> sortedGroupedByDay = new LinkedHashMap<>();
+        for (Map.Entry<Integer, List<TripActivity>> entry : sortedDays) {
+            // Also sort activities within each day by time
+            java.util.Collections.sort(entry.getValue(), (a1, a2) -> Long.compare(a1.getDateTime(), a2.getDateTime()));
+            sortedGroupedByDay.put(entry.getKey(), entry.getValue());
+        }
+
+        // Update timeline adapter
+        timelineAdapter.setTimelineData(sortedGroupedByDay);
+        
+        // Show/hide empty state
+        if (activities.isEmpty()) {
+            Log.d(TAG, "📱 No activities - showing empty state");
+            timelineRecyclerView.setVisibility(View.GONE);
+            emptyStateText.setVisibility(View.VISIBLE);
+            emptyStateText.setText("No activities planned yet.\nTap + to add your first activity!");
+            
             if (timelineAdapter != null) {
-                timelineAdapter.submitData(groupedActivities);
-                Log.d(TAG, "📱 Data submitted to adapter successfully");
-            } else {
-                Log.e(TAG, "📱 ERROR: Timeline adapter is null!");
-                return;
+                timelineAdapter.setTimelineData(new java.util.HashMap<>());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "📱 ERROR: Failed to submit data to adapter", e);
             return;
         }
         

@@ -35,9 +35,15 @@ public class TripTimelineAdapter extends RecyclerView.Adapter<TripTimelineAdapte
         this.clickListener = clickListener;
     }
 
-    public void submitData(Map<Integer, List<TripActivity>> groupedActivities) {
+    public void setTimelineData(Map<Integer, List<TripActivity>> groupedActivities) {
+        // Sort the days chronologically
+        List<Map.Entry<Integer, List<TripActivity>>> sortedDays = new ArrayList<>(groupedActivities.entrySet());
+        java.util.Collections.sort(sortedDays, (e1, e2) -> Integer.compare(e1.getKey(), e2.getKey()));
+
         daysList.clear();
-        for (Map.Entry<Integer, List<TripActivity>> entry : groupedActivities.entrySet()) {
+        for (Map.Entry<Integer, List<TripActivity>> entry : sortedDays) {
+            // Also sort activities within each day by time
+            java.util.Collections.sort(entry.getValue(), (a1, a2) -> Long.compare(a1.getDateTime(), a2.getDateTime()));
             daysList.add(new DayData(entry.getKey(), entry.getValue()));
         }
         notifyDataSetChanged();

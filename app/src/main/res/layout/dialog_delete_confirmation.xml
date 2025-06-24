@@ -28,7 +28,7 @@
         android:layout_marginTop="16dp"
         android:gravity="center"
         android:text="Delete Trip"
-        android:textColor="@color/error"
+        android:textColor="?attr/colorPrimary"
         android:textStyle="bold" />
 
     <!-- Delete Message -->
@@ -64,11 +64,10 @@
         <!-- Delete Button -->
         <Button
             android:id="@+id/btn_delete"
+            style="@style/WanderPlan.Button.Primary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Delete"
-            android:textColor="@color/white"
-            android:backgroundTint="@color/error" />
+            android:text="Delete" />
 
     </LinearLayout>
 
