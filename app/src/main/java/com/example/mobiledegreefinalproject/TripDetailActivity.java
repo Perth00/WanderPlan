@@ -264,9 +264,20 @@ public class TripDetailActivity extends BaseActivity {
     }
 
     private void setupToolbar() {
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Trip Details");
+        // Set up the custom toolbar
+        androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+                getSupportActionBar().setTitle("Trip Details");
+            }
+            
+            // Set up navigation click listener
+            toolbar.setNavigationOnClickListener(v -> {
+                getOnBackPressedDispatcher().onBackPressed();
+            });
         }
     }
     
@@ -347,7 +358,10 @@ public class TripDetailActivity extends BaseActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         
-        if (id == R.id.action_sync) {
+        if (id == R.id.action_share_trip) {
+            shareTrip();
+            return true;
+        } else if (id == R.id.action_sync) {
             showComingSoonSyncDialog();
             return true;
         } else if (id == R.id.action_delete_trip) {
@@ -479,6 +493,238 @@ public class TripDetailActivity extends BaseActivity {
                     }
                 }
             });
+        }
+    }
+
+    /**
+     * Share the trip details including activities and budget via implicit intents
+     */
+    private void shareTrip() {
+        if (currentTrip == null) {
+            Toast.makeText(this, "Trip information not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Show loading indicator
+        Toast.makeText(this, "Preparing trip data for sharing...", Toast.LENGTH_SHORT).show();
+
+        // Collect trip data in background thread
+        new Thread(() -> {
+            try {
+                String shareContent = buildShareContent();
+                
+                // Create sharing intent on main thread
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) {
+                        createAndStartShareIntent(shareContent);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error building share content", e);
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) {
+                        Toast.makeText(this, "Error preparing share data", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * Build the formatted content for sharing
+     */
+    private String buildShareContent() {
+        StringBuilder content = new StringBuilder();
+        
+        // Trip header
+        content.append("✈️ ").append(currentTrip.getTitle()).append("\n");
+        content.append("📍 ").append(currentTrip.getDestination()).append("\n");
+        content.append("📅 ").append(currentTrip.getDateRange()).append("\n");
+        content.append("⏰ ").append(currentTrip.getDurationDays()).append(" days\n\n");
+        
+        // Activities section
+        List<TripActivity> activities = getCurrentActivities();
+        if (activities != null && !activities.isEmpty()) {
+            content.append("🎯 ACTIVITIES:\n");
+            content.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+            
+            // Group activities by day
+            Map<Integer, List<TripActivity>> activitiesByDay = groupActivitiesByDay(activities);
+            
+            for (Map.Entry<Integer, List<TripActivity>> entry : activitiesByDay.entrySet()) {
+                int day = entry.getKey();
+                List<TripActivity> dayActivities = entry.getValue();
+                
+                content.append("\n📆 Day ").append(day).append(":\n");
+                content.append("─────────────────────────────────────────────\n");
+                
+                for (TripActivity activity : dayActivities) {
+                    content.append("• ").append(activity.getTitle());
+                    if (activity.getTimeString() != null && !activity.getTimeString().isEmpty()) {
+                        content.append(" (").append(activity.getTimeString()).append(")");
+                    }
+                    content.append("\n");
+                    
+                    if (activity.getDescription() != null && !activity.getDescription().isEmpty()) {
+                        content.append("  ").append(activity.getDescription()).append("\n");
+                    }
+                    
+                    if (activity.getLocation() != null && !activity.getLocation().isEmpty()) {
+                        content.append("  📍 ").append(activity.getLocation()).append("\n");
+                    }
+                    content.append("\n");
+                }
+            }
+        } else {
+            content.append("🎯 ACTIVITIES: No activities planned yet\n\n");
+        }
+        
+        // Budget section
+        String budgetInfo = getBudgetInfo();
+        if (budgetInfo != null) {
+            content.append(budgetInfo);
+        }
+        
+        // Footer
+        content.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        content.append("📱 Shared from WanderPlan Travel App\n");
+        content.append("🌟 Plan your next adventure with us!");
+        
+        return content.toString();
+    }
+
+    /**
+     * Get current activities based on the mode (Firebase or local)
+     */
+    private List<TripActivity> getCurrentActivities() {
+        if (isFirebaseOnlyMode && !firebaseActivitiesCache.isEmpty()) {
+            return new ArrayList<>(firebaseActivitiesCache);
+        } else {
+            // Get activities from local database
+            return getLocalActivities();
+        }
+    }
+
+    /**
+     * Get activities from local database synchronously
+     */
+    private List<TripActivity> getLocalActivities() {
+        try {
+            TripRepository repository = TripRepository.getInstance(this);
+            return repository.getActivitiesForTripSync(tripId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting local activities", e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Group activities by day for better organization
+     */
+    private Map<Integer, List<TripActivity>> groupActivitiesByDay(List<TripActivity> activities) {
+        Map<Integer, List<TripActivity>> grouped = new LinkedHashMap<>();
+        
+        for (TripActivity activity : activities) {
+            int day = activity.getDayNumber();
+            if (day <= 0) day = 1; // Default to day 1 if not set
+            
+            grouped.computeIfAbsent(day, k -> new ArrayList<>()).add(activity);
+        }
+        
+        return grouped;
+    }
+
+    /**
+     * Get budget information for the trip
+     */
+    private String getBudgetInfo() {
+        try {
+            com.example.mobiledegreefinalproject.repository.BudgetRepository budgetRepo = 
+                com.example.mobiledegreefinalproject.repository.BudgetRepository.getInstance(this);
+            
+            com.example.mobiledegreefinalproject.repository.BudgetRepository.BudgetData budgetData = 
+                budgetRepo.loadBudgetDataLocally();
+            
+            StringBuilder budgetContent = new StringBuilder();
+            budgetContent.append("💰 BUDGET INFORMATION:\n");
+            budgetContent.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+            
+            // Trip specific budget
+            Double tripBudget = budgetData.tripBudgets.get(tripId);
+            if (tripBudget != null && tripBudget > 0) {
+                budgetContent.append("💵 Trip Budget: RM").append(String.format("%.2f", tripBudget)).append("\n");
+            }
+            
+            // Trip specific expenses
+            List<com.example.mobiledegreefinalproject.model.Expense> tripExpenses = budgetData.tripExpenses.get(tripId);
+            if (tripExpenses != null && !tripExpenses.isEmpty()) {
+                budgetContent.append("\n📊 EXPENSES:\n");
+                budgetContent.append("─────────────────────────────────────────────\n");
+                
+                double totalExpenses = 0.0;
+                Map<com.example.mobiledegreefinalproject.model.Expense.Category, Double> categoryTotals = new HashMap<>();
+                
+                for (com.example.mobiledegreefinalproject.model.Expense expense : tripExpenses) {
+                    budgetContent.append("• ").append(expense.getTitle())
+                               .append(" - RM").append(String.format("%.2f", expense.getAmount()))
+                               .append(" (").append(expense.getCategoryDisplayName()).append(")\n");
+                    
+                    totalExpenses += expense.getAmount();
+                    categoryTotals.merge(expense.getCategory(), expense.getAmount(), Double::sum);
+                }
+                
+                budgetContent.append("\n💸 Total Expenses: RM").append(String.format("%.2f", totalExpenses)).append("\n");
+                
+                if (tripBudget != null && tripBudget > 0) {
+                    double remaining = tripBudget - totalExpenses;
+                    budgetContent.append("💰 Remaining Budget: RM").append(String.format("%.2f", remaining)).append("\n");
+                }
+                
+                // Category breakdown
+                if (!categoryTotals.isEmpty()) {
+                    budgetContent.append("\n📈 CATEGORY BREAKDOWN:\n");
+                    budgetContent.append("─────────────────────────────────────────────\n");
+                    for (Map.Entry<com.example.mobiledegreefinalproject.model.Expense.Category, Double> entry : categoryTotals.entrySet()) {
+                        budgetContent.append(entry.getKey().getEmoji()).append(" ")
+                                   .append(entry.getKey().getDisplayName()).append(": RM")
+                                   .append(String.format("%.2f", entry.getValue())).append("\n");
+                    }
+                }
+            } else {
+                budgetContent.append("No expenses recorded yet\n");
+            }
+            
+            return budgetContent.toString();
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting budget info", e);
+            return "💰 BUDGET: Information not available\n";
+        }
+    }
+
+    /**
+     * Create and start the sharing intent
+     */
+    private void createAndStartShareIntent(String content) {
+        try {
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("text/plain");
+            shareIntent.putExtra(Intent.EXTRA_TEXT, content);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Trip: " + currentTrip.getTitle());
+            
+            // Create chooser to show all available sharing apps
+            Intent chooserIntent = Intent.createChooser(shareIntent, "Share Trip via");
+            
+            // Add flags to ensure proper behavior
+            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            
+            startActivity(chooserIntent);
+            
+            // Show success message
+            Toast.makeText(this, "Opening sharing options...", Toast.LENGTH_SHORT).show();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating share intent", e);
+            Toast.makeText(this, "Error opening sharing options", Toast.LENGTH_SHORT).show();
         }
     }
 
