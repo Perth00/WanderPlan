@@ -53,6 +53,9 @@ public class MainActivity extends BaseActivity {
     protected void onResume() {
         super.onResume();
         
+        // Update navigation bar when returning from settings or other activities
+        ThemeManager.updateNavigationBar(this);
+        
         // Check if activity is finishing to prevent crashes during logout
         if (isFinishing()) {
             android.util.Log.w("MainActivity", "Activity is finishing - skipping onResume operations");

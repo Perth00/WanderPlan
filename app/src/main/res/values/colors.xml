@@ -24,6 +24,11 @@
     <color name="card_background">#FFFFFF</color>
     <color name="surface_light">#F8F9FA</color>
     
+    <!-- Dark Theme Colors -->
+    <color name="dark_background">#121212</color>
+    <color name="dark_surface">#1F1F1F</color>
+    <color name="dark_card_background">#2C2C2C</color>
+    
     <!-- Primary Theme Colors -->
     <color name="primary">#FFB3D9</color>
     <color name="primary_variant">#FF8CC8</color>

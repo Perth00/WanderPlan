@@ -1,21 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.MobileDegreeFinalProject" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
-    </style>
-
     <!-- Dark theme overrides -->
     <style name="Base.Theme.WanderPlan" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Background colors -->
-        <item name="android:colorBackground">@color/background_light</item>
-        <item name="colorSurface">@color/surface_light</item>
-        <item name="colorOnBackground">@color/dark_grey</item>
-        <item name="colorOnSurface">@color/dark_grey</item>
-
-        <!-- Navigation bar -->
-        <item name="android:navigationBarColor">@color/surface_light</item>
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_variant</item>
+        <item name="colorPrimaryLight">@color/primary_light</item>
+        <item name="colorOnPrimary">@color/white</item>
+        
+        <!-- Secondary colors -->
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorSecondaryVariant">@color/secondary_variant</item>
+        <item name="colorOnSecondary">@color/dark_grey</item>
+        
+        <!-- Dark theme background colors -->
+        <item name="android:colorBackground">@color/dark_background</item>
+        <item name="colorSurface">@color/dark_surface</item>
+        <item name="colorOnBackground">@color/white</item>
+        <item name="colorOnSurface">@color/white</item>
+        
+        <!-- Status bar for dark theme -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="android:windowLightStatusBar">false</item>
+        
+        <!-- Navigation bar for dark theme -->
+        <item name="android:navigationBarColor">@color/dark_surface</item>
         <item name="android:windowLightNavigationBar">false</item>
+        
+        <!-- Window background for dark theme -->
+        <item name="android:windowBackground">@color/dark_background</item>
+    </style>
+    
+    <!-- Bottom Navigation Dark Theme -->
+    <style name="WanderPlan.BottomNavigation" parent="Widget.Material3.BottomNavigationView">
+        <item name="android:background">@color/dark_surface</item>
+        <item name="itemIconTint">@color/bottom_nav_color_selector</item>
+        <item name="itemTextColor">@color/bottom_nav_color_selector</item>
+        <item name="elevation">8dp</item>
+        <item name="itemIconSize">28dp</item>
+        <item name="itemTextAppearanceActive">@style/WanderPlan.BottomNavigation.TextActive</item>
+        <item name="itemTextAppearanceInactive">@style/WanderPlan.BottomNavigation.TextInactive</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="itemActiveIndicatorStyle">@null</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
     </style>
 </resources>
