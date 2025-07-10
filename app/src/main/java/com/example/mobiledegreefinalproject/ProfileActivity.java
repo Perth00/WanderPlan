@@ -71,8 +71,11 @@ public class ProfileActivity extends BaseActivity {
     protected void onResume() {
         super.onResume();
         try {
+            // Update navigation bar in case theme changed
+            ThemeManager.updateNavigationBar(this);
+            
             // Refresh user data when returning to this activity
-            loadUserData();
+            loadUserData(); // This will also refresh profile icon colors
         } catch (Exception e) {
             android.util.Log.e("ProfileActivity", "Error in onResume", e);
         }
@@ -245,7 +248,7 @@ public class ProfileActivity extends BaseActivity {
         try {
             profileImage.setImageResource(R.drawable.ic_person);
             profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(
-                getThemeColor(com.google.android.material.R.attr.colorPrimary)
+                ThemeManager.getCurrentPrimaryColor(this)
             ));
         } catch (Exception e) {
             android.util.Log.e("ProfileActivity", "Error loading default profile image", e);

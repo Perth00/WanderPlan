@@ -3,7 +3,11 @@ package com.example.mobiledegreefinalproject;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
+import android.view.View;
+import android.view.Window;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 
 public class ThemeManager {
     private static final String PREFS_NAME = "ThemePrefs";
@@ -44,6 +48,11 @@ public class ThemeManager {
                 break;
         }
         applyColorTheme(context);
+        
+        // Apply navigation bar styling if context is an Activity
+        if (context instanceof Activity) {
+            updateNavigationBar((Activity) context);
+        }
     }
 
     public static void applyColorTheme(Context context) {
@@ -77,6 +86,33 @@ public class ThemeManager {
         }
     }
 
+    public static void updateNavigationBar(Activity activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window window = activity.getWindow();
+            boolean isDarkTheme = isDarkTheme(activity);
+            
+            if (isDarkTheme) {
+                // Dark theme - dark navigation bar
+                window.setNavigationBarColor(ContextCompat.getColor(activity, R.color.dark_surface));
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    View decorView = window.getDecorView();
+                    int flags = decorView.getSystemUiVisibility();
+                    flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR; // Remove light navigation bar flag
+                    decorView.setSystemUiVisibility(flags);
+                }
+            } else {
+                // Light theme - light navigation bar
+                window.setNavigationBarColor(ContextCompat.getColor(activity, R.color.white));
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    View decorView = window.getDecorView();
+                    int flags = decorView.getSystemUiVisibility();
+                    flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR; // Add light navigation bar flag
+                    decorView.setSystemUiVisibility(flags);
+                }
+            }
+        }
+    }
+
     public static void setTheme(Context context, String theme) {
         SharedPreferences.Editor editor = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit();
         editor.putString(KEY_THEME, theme);
@@ -98,5 +134,40 @@ public class ThemeManager {
     public static String getColorTheme(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         return prefs.getString(KEY_COLOR_THEME, THEME_PASTEL_PINK);
+    }
+    
+    /**
+     * Check if the current theme is dark mode
+     */
+    public static boolean isDarkTheme(Context context) {
+        String theme = getTheme(context);
+        if (THEME_DARK.equals(theme)) {
+            return true;
+        } else if (THEME_LIGHT.equals(theme)) {
+            return false;
+        } else {
+            // System theme - check system setting
+            int nightModeFlags = context.getResources().getConfiguration().uiMode & 
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+            return nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        }
+    }
+    
+    /**
+     * Get the current primary color based on theme
+     */
+    public static int getCurrentPrimaryColor(Context context) {
+        android.util.TypedValue typedValue = new android.util.TypedValue();
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorPrimary, typedValue, true);
+        return typedValue.data;
+    }
+    
+    /**
+     * Get the current secondary color based on theme
+     */
+    public static int getCurrentSecondaryColor(Context context) {
+        android.util.TypedValue typedValue = new android.util.TypedValue();
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorSecondary, typedValue, true);
+        return typedValue.data;
     }
 } 

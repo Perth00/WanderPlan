@@ -64,8 +64,13 @@ public class SettingsFragment extends Fragment {
     public void onResume() {
         super.onResume();
         try {
+            // Update navigation bar when returning to settings (in case theme changed)
+            if (getActivity() != null) {
+                ThemeManager.updateNavigationBar(getActivity());
+            }
+            
             updateAuthenticationOptions();
-            updateProfile();
+            updateProfile(); // This will also refresh profile icon colors
             updateSyncVisibility();
         } catch (Exception e) {
             android.util.Log.e("SettingsFragment", "Error in onResume", e);
@@ -177,16 +182,16 @@ public class SettingsFragment extends Fragment {
                     int padding = (int) (16 * getResources().getDisplayMetrics().density); // 16dp padding
                     profileImage.setPadding(padding, padding, padding, padding);
                     profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(
-                        requireContext().getColor(R.color.secondary)));
+                        ThemeManager.getCurrentSecondaryColor(requireContext())));
                     profileImage.setImageResource(R.drawable.ic_person);
                 }
             } else {
-                // Guest user - show default person icon with pink tint and padding
+                // Guest user - show default person icon with theme primary color tint and padding
                 android.util.Log.d("SettingsFragment", "Guest user - showing default icon");
                 int padding = (int) (16 * getResources().getDisplayMetrics().density); // 16dp padding
                 profileImage.setPadding(padding, padding, padding, padding);
                 profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(
-                    getThemeColor(com.google.android.material.R.attr.colorPrimary)));
+                    ThemeManager.getCurrentPrimaryColor(requireContext())));
                 profileImage.setImageResource(R.drawable.ic_person);
             }
         } catch (Exception e) {
@@ -198,7 +203,7 @@ public class SettingsFragment extends Fragment {
                     profileImage.setPadding(padding, padding, padding, padding);
                     profileImage.setImageResource(R.drawable.ic_person);
                     profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(
-                        getThemeColor(com.google.android.material.R.attr.colorPrimary)));
+                        ThemeManager.getCurrentPrimaryColor(requireContext())));
                 }
             } catch (Exception e2) {
                 android.util.Log.e("SettingsFragment", "Error in fallback image loading", e2);
